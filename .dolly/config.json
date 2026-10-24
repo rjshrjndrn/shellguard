@@ -1,0 +1,36 @@
+{
+  "version": 7,
+  "statuses": [
+    "todo",
+    "planning",
+    "working",
+    "validating",
+    "done"
+  ],
+  "reviewStatus": "validating",
+  "doneStatus": "done",
+  "planSections": [
+    "Problem",
+    "Goal",
+    "Scope",
+    "Success Criteria",
+    "Changes",
+    "Risks",
+    "Test Plan",
+    "Open Questions"
+  ],
+  "memo": {
+    "auto": false
+  },
+  "install": {
+    "scope": "local",
+    "mcp": false,
+    "hooks": true
+  },
+  "reindex": {
+    "autoLog": true,
+    "autoLogOnlyWhenWorking": true,
+    "includeThinking": false
+  },
+  "user": null
+}

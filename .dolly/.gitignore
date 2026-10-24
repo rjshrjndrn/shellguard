@@ -1,0 +1,6 @@
+local.json
+*.tmp-*
+.local/
+.claude/
+.cursor/
+.codex/
