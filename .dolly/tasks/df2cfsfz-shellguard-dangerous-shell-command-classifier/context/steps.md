@@ -106,3 +106,22 @@ Lesson 6 (model B, frozen base) landed. Hypothesis refuted.
 - Did not try: MLP head, other encoders (code-specific like jina-code / CodeBERT). Possible but out of plan.
 Next: step 7 fine-tune bge-small (MPS for training allowed, export ONNX, CPU inference). 8 GB RAM risk. Key question to measure: does fine-tuning pull rm -rf / and rm -rf ./build apart, and does it beat A at all? If not, A ships.
 <!-- /dolly:step 0006 -->
+
+<!-- dolly:step 0007 -->
+## 0007 · 2026-10-24T14:09:39Z · @rjshrjndrn
+
+- task status: working
+- files: none
+
+Lesson 7 (model C, fine-tuned bge-small) landed.
+- model_c.py: AutoModelForSequenceClassification(bge-small, 2 labels), manual loop: AdamW lr 5e-5 wd 0.01, linear warmup 10%, batch 32, 2 epochs, seed 42, padding="max_length" 64 tokens. MPS if available. Export torch.onnx.export(dynamo=True, dynamic batch/seq, external_data=False) + tokenizer.json via tok.backend_tokenizer.save. Inference: tokenizers + onnxruntime CPUExecutionProvider + softmax; torch/transformers imported only inside finetune/export.
+- torch/transformers/onnx/onnxscript are dev deps only.
+- 8 GB issue: dynamic padding run swapped (4.3 GB, 22% CPU, 13 min, killed). 40-step benchmarks: mps fixed 381ms/step, mps dynamic 282, cpu dynamic 326 (CPU only ~15% slower than MPS here). Fixed padding run: MPS driver mem flat 2.30 GB all 1414 steps, 572 s, peak RSS 1.56 GB. Root cause (shape-cache growth) inferred, not proven.
+- Loss 0.69 -> 0.10 (end ep1) -> ~0.02.
+- Results CPU: test recall 0.985 precision 0.987 F1 0.986 (43 missed, 36 FA); golden recall 0.92 precision 0.958 F1 0.939, wrong: git stash clear, nc -e /bin/sh (p=0.00!), cat /etc/hosts. 14.2 ms/cmd, 135 MB fp32 onnx.
+- vs A: golden 3 wrong vs 7; test precision better; 57x slower, 120x bigger.
+- nc -e: 0 occurrences in train -> C confidently wrong (0.00), A unsure (0.64). Over-confidence on unseen patterns.
+- Tests (7): ONNX == torch within 1e-4; CPU-only provider; fresh process imports no torch/transformers; load() string path bug found+fixed.
+- Warnings from dynamo exporter about axis names sharing constraints: harmless.
+Next: step 8 choose. Options: A (fast/tiny) vs C (better golden). Try int8 dynamic quantisation of C (onnxruntime.quantization.quantize_dynamic) to cut size/latency; tune threshold on a validation slice of TRAIN (not test, not golden); then wire shellguard.predict and turn golden tests green or document remaining misses. Data gaps (nc -e, git stash clear, /etc reads) are a candidate follow-up: add hand examples to TRAIN.
+<!-- /dolly:step 0007 -->

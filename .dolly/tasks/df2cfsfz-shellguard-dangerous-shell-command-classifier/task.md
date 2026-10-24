@@ -6,16 +6,16 @@ status: working
 owner: rjshrjndrn
 collaborators: [rjshrjndrn]
 tags: []
-steps: 6
+steps: 7
 spec_version: 2
 created: 2026-10-24T12:58:38Z
-updated: 2026-10-24T13:37:33Z
+updated: 2026-10-24T14:09:39Z
 ---
 
 # df2cfsfz · shellguard: dangerous shell command classifier
 
 <!-- dolly:header -->
-`working` · spec v2 · @rjshrjndrn · 6 steps · updated 2026-10-24 13:37Z
+`working` · spec v2 · @rjshrjndrn · 7 steps · updated 2026-10-24 14:09Z
 <!-- /dolly:header -->
 
 ## Spec
@@ -65,4 +65,6 @@ Plan complete. Status → todo.
   full: `steps.md#0005`
 - `2026-10-24 13:37Z` @rjshrjndrn: Model B (frozen bge-small + logreg) loses to A everywhere: test F1 0.893 vs 0.980, 5.6ms vs 0.25ms, 64MB. bge-small rates rm -rf / ~ rm -rf ./build at 0.91 similarity; the deciding detail is erased before the head.
   files: `results/baseline.json` · full: `steps.md#0006`
+- `2026-10-24 14:09Z` @rjshrjndrn: Model C (fine-tuned bge-small, ONNX CPU): best golden F1 0.939 (3 wrong vs A's 7) and test F1 0.986, but 14 ms/cmd and 135 MB. Fixed 64-token padding kept MPS at 2.3 GB on 8 GB RAM. Confidently wrong on nc -e (0 training examples).
+  full: `steps.md#0007`
 
