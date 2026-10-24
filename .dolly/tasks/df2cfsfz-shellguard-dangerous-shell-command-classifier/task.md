@@ -6,16 +6,16 @@ status: working
 owner: rjshrjndrn
 collaborators: [rjshrjndrn]
 tags: []
-steps: 4
+steps: 5
 spec_version: 2
 created: 2026-10-24T12:58:38Z
-updated: 2026-10-24T13:21:34Z
+updated: 2026-10-24T13:29:54Z
 ---
 
 # df2cfsfz · shellguard: dangerous shell command classifier
 
 <!-- dolly:header -->
-`working` · spec v2 · @rjshrjndrn · 4 steps · updated 2026-10-24 13:21Z
+`working` · spec v2 · @rjshrjndrn · 5 steps · updated 2026-10-24 13:29Z
 <!-- /dolly:header -->
 
 ## Spec
@@ -61,4 +61,6 @@ Plan complete. Status → todo.
   full: `steps.md#0003`
 - `2026-10-24 13:21Z` @rjshrjndrn: Regex floor set: 17 patterns give test recall 0.236 / precision 0.920, golden 0.76 (flattering, same author). Shared scorer writes results/<model>.json for every model.
   full: `steps.md#0004`
+- `2026-10-24 13:29Z` @rjshrjndrn: Model A (char tf-idf + logreg, no base model): test recall 0.986 vs regex 0.236, 250us/cmd, 1.1MB. Golden F1 0.86: dataset shortcuts (/etc/, echo) and gaps (fork bomb, stash clear). Not tuned on golden.
+  full: `steps.md#0005`
 

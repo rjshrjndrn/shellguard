@@ -71,3 +71,21 @@ Lesson 4 (regex baseline + scorer) landed.
 - Dataset nuance: mkfs.* -n / -N (dry run) labelled safe -> regex false alarms. Some labels look noisy: "yes sample > ./node_modules/.cache/test.img" dangerous.
 Next: step 5 model A (TF-IDF char n-grams + logistic regression). Must export to a CPU-only artefact; plan JSON weights or joblib first, decide in step 8.
 <!-- /dolly:step 0004 -->
+
+<!-- dolly:step 0005 -->
+## 0005 · 2026-10-24T13:29:54Z · @rjshrjndrn
+
+- task status: working
+- files: none
+
+Lesson 5 (model A) landed.
+- model_a.py: Pipeline(TfidfVectorizer(char, 2-5, min_df=2, sublinear_tf), LogisticRegression(max_iter=1000)); joblib save/load (pickle, trusted-only); predict(cmd, model=None) lazy-loads models/model_a.joblib; threshold 0.5.
+- make train MODEL=model_a: 2.4s, 40,965 features, 1.1 MB.
+- Results: test recall 0.986 precision 0.973 F1 0.980 (41 missed, 77 FA); golden recall 0.88 precision 0.846 F1 0.863 (3 missed, 4 FA); 250 us/cmd CPU.
+- Train recall 0.990 -> no overfitting in-distribution.
+- Golden misses = data gaps: fork bomb (0 in train), git stash clear (0), kubectl delete namespace (11 rows, p=0.44).
+- Golden false alarms = shortcut learning: cat /etc/hosts 0.94 (/etc/ 332 dangerous vs 36 safe in train), echo $PATH 0.86 (echo 499 vs 101), tar -czf 0.69, rm -rf node_modules 0.69.
+- Rule kept: never tune on golden. Fixes must come from training data (e.g. add safe /etc reads, fork bombs) or better models.
+- Golden tests (tests/test_golden.py) still red: they import shellguard.predict, wired only in step 8 after choosing a model.
+Next: step 6 model B (frozen bge-small via fastembed + logreg). Hypothesis: semantic embeddings may reduce /etc/ shortcut false alarms but may lose exact-token signal like -fdx.
+<!-- /dolly:step 0005 -->
