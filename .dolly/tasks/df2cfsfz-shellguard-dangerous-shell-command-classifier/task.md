@@ -2,29 +2,38 @@
 id: df2cfsfz
 slug: shellguard-dangerous-shell-command-classifier
 title: "shellguard: dangerous shell command classifier"
-status: planning
+status: working
 owner: rjshrjndrn
 collaborators: [rjshrjndrn]
 tags: []
-steps: 0
-spec_version: 1
+steps: 1
+spec_version: 2
 created: 2026-10-24T12:58:38Z
-updated: 2026-10-24T13:07:19Z
+updated: 2026-10-24T13:13:08Z
 ---
 
 # df2cfsfz · shellguard: dangerous shell command classifier
 
 <!-- dolly:header -->
-`planning` · spec v1 · @rjshrjndrn · 0 steps · updated 2026-10-24 13:07Z
+`working` · spec v2 · @rjshrjndrn · 1 step · updated 2026-10-24 13:13Z
 <!-- /dolly:header -->
 
 ## Spec
 
-_planning in progress — see `context/plan.md`_
+A local CLI classifies a single shell command as dangerous or safe with a probability, in milliseconds on an M1. Dangerous = malicious OR irreversible-destructive. The model is chosen by measured recall on a held-out test set after comparing three approaches: no base model (char n-gram TF-IDF + logistic regression), frozen base model (bge-small embeddings + logistic regression), and fine-tuned base model (bge-small fine-tuned). Along the way the owner learns data labelling, train/test splits, baselines, evaluation and fine-tuning.
+
+Full spec: `context/spec.md` · plan: `context/plan.md`
 
 ## Success Criteria
 
-- [ ] _TBD_
+- [ ] Golden test set (~40 hand-labelled commands incl. git clean -fdx, rm -rf ~, dd of=/dev/sda, reverse shell) exists before any model, and the chosen model passes all of it
+- [ ] No command string appears in both train and test (asserted by test)
+- [ ] Regex baseline recall/precision recorded as the floor
+- [ ] Models A, B, C each report recall, precision, F1 overall and per kind on the same test split
+- [ ] Every model's inference benchmarked CPU-only (GPU/MPS/CoreML disabled): latency per command, cold start, artefact size
+- [ ] Chosen model has higher recall on dangerous than the regex baseline, at a threshold picked from the precision/recall curve
+- [ ] shellguard "<cmd>" prints label + probability on a CPU-only machine; CLI covered by a test
+- [ ] Each lesson = one commit with tests written first
 
 ## Full Context
 
@@ -34,4 +43,16 @@ _planning in progress — see `context/plan.md`_
 
 ## Log
 
-_no steps yet_
+- `2026-10-24 13:10Z` @rjshrjndrn: status planning → working.
+- `2026-10-24 13:10Z` @rjshrjndrn: spec → v2. planning finished — spec derived from plan.md
+  previous version kept in `spec.md`
+
+### plan finalized · 2026-10-24 13:10Z · @rjshrjndrn
+
+Plan complete. Status → todo.
+
+- plan: `context/plan.md`
+- `2026-10-24 13:10Z` @rjshrjndrn: status todo → working.
+- `2026-10-24 13:13Z` @rjshrjndrn: Golden set (48 real-looking cmds) is the spec; 48 golden tests red until a model exists. README documents every step, dataset pinned to HF commit 5e1283e.
+  full: `steps.md#0001`
+

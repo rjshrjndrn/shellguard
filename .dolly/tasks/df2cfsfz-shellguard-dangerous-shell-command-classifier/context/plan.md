@@ -55,7 +55,7 @@ Manual: owner runs CLI on 10 commands of their own choosing and reviews top-20 m
 - [x] Python level: (a) comfortable
 - [x] Dataset: use yannelli/cli-command-risk, add golden set by hand
 - [x] Integration target / call pattern: deferred until model exists
-- [ ] Confirm label rule: dangerous = NOT reversible OR risk_level in (high, critical). Gives ~14.4k dangerous / ~13.9k safe, roughly balanced.
+- [x] Label rule: dangerous = NOT reversible OR risk_level in (high, critical)
 
 ## Q&A
 
@@ -90,4 +90,8 @@ Manual: owner runs CLI on 10 commands of their own choosing and reviews top-20 m
 **Q (2026-10-24 13:07Z):** Integration target and call pattern?
 
 **A:** Deferred: build the model first, decide integration later. Constraint kept: inference CPU-only.
+
+**Q (2026-10-24 13:10Z):** Label rule?
+
+**A:** Confirmed: dangerous = NOT reversible OR risk_level in (high, critical).
 
