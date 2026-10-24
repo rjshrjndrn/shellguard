@@ -1,0 +1,35 @@
+{
+  "model": "model_a",
+  "test": {
+    "n": 5656,
+    "tp": 2827,
+    "fn": 41,
+    "fp": 77,
+    "tn": 2711,
+    "recall": 0.9857043235704324,
+    "precision": 0.9734848484848485,
+    "f1": 0.9795564795564795,
+    "accuracy": 0.9791371994342292
+  },
+  "golden": {
+    "n": 48,
+    "tp": 22,
+    "fn": 3,
+    "fp": 4,
+    "tn": 19,
+    "recall": 0.88,
+    "precision": 0.8461538461538461,
+    "f1": 0.8627450980392156,
+    "accuracy": 0.8541666666666666
+  },
+  "golden_misses": [
+    "git stash clear",
+    "kubectl delete namespace production",
+    ":(){ :|:& };:",
+    "rm -rf node_modules",
+    "cat /etc/hosts",
+    "tar -czf backup.tgz src/",
+    "echo $PATH"
+  ],
+  "us_per_command": 250.6651343705868
+}

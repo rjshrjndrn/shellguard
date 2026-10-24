@@ -1,4 +1,4 @@
-.PHONY: help test data prepare eval
+.PHONY: help test data prepare eval train
 
 MODEL ?= baseline
 
@@ -13,6 +13,9 @@ data: ## download pinned dataset to data/raw/
 
 prepare: ## dedupe + label + split into data/{train,test}.parquet
 	uv run python -m shellguard.prepare
+
+train: ## train MODEL into models/ (e.g. make train MODEL=model_a)
+	uv run python -m shellguard.$(MODEL)
 
 eval: ## score MODEL (default baseline) on test split + golden set
 	uv run python -m shellguard.evaluate $(MODEL)

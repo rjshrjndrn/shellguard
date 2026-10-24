@@ -258,23 +258,72 @@ Tests (written first): `tests/test_baseline.py` — 7 obvious dangerous, 5 obvio
 safe; `tests/test_evaluate.py` — scorer counts/rates on a toy example, no
 crash at zero flags, `run()` writes results for both splits.
 
-### Step 5 — Model A: no base model (TF-IDF + logistic regression) ⏳
+### Step 5 — Model A: no base model (TF-IDF + logistic regression) ✅
 
-Trains from nothing, in seconds, on CPU.
-
-```
-"git clean -fdx" ──▶ chop into character pieces   ──▶ count + weight   ──▶ weighted sum ──▶ squash to 0..1
-                     "gi","it","t ","cl",…,"-fdx"      (TF-IDF vector)      (logistic        = P(dangerous)
-                     (char n-grams, length 2–5)                              regression)
+```bash
+make train MODEL=model_a   # 2.4 s on M1 CPU → models/model_a.joblib (1.1 MB)
+make eval  MODEL=model_a   # → results/model_a.json
 ```
 
-- **Character n-grams**: overlapping slices of 2–5 characters. Catches `-rf`,
-  `/dev/`, `--force` even inside unseen commands.
-- **TF-IDF**: pieces that appear everywhere (like `" "`) get low weight;
-  rare telling ones (like `/dev/tcp`) get high weight.
-- **Logistic regression**: learns one weight per piece. Positive weight pushes
-  toward dangerous. Training = adjust weights to reduce mistakes on train data.
-- Expected size < 1 MB. Measured earlier on this Mac: ~215 µs per command, CPU.
+Code: `src/shellguard/model_a.py` — a 2-step scikit-learn `Pipeline`:
+
+```
+"git clean -fdx"
+   │ 1. TfidfVectorizer(analyzer="char", ngram_range=(2,5), min_df=2, sublinear_tf=True)
+   ▼    chop into every 2–5 char slice: "gi","it",…,"-fdx" → 40,965 possible slices
+[0, 0.12, 0, 0.31, …]   one number per slice: how much this command has it, down-weighted
+   │                    if the slice is common everywhere (TF-IDF)
+   │ 2. LogisticRegression(max_iter=1000)
+   ▼    weighted sum of those numbers → squashed to 0..1
+P(dangerous) = 0.97   ≥ 0.5 → "dangerous"
+```
+
+Settings and why:
+- `analyzer="char"` — slices span spaces, so `"-rf /"`, `"| sh"`, `"of=/dev"` are
+  features. (`char_wb` would cut at spaces.)
+- `ngram_range=(2,5)` — slices of 2 to 5 characters.
+- `min_df=2` — ignore slices seen in only 1 command (noise; keeps the file small).
+- `sublinear_tf=True` — a slice repeated 10× counts ~3×, not 10×.
+- `max_iter=1000` — let the optimiser run long enough to converge.
+- Nothing was tuned on the test set or golden set.
+
+**Training** = `pipeline.fit(train_commands, train_labels)`. The vectorizer
+learns the slice vocabulary + weights; the logistic regression finds one weight
+per slice that best separates dangerous from safe on the 22,624 train commands.
+
+**Saving** = `joblib.dump` → `models/model_a.joblib`. joblib uses pickle, which
+can run code on load — fine for a file we built ourselves, never for a
+downloaded one. (Step 8 decides the shipped format: JSON weights or ONNX.)
+
+**Result:**
+
+| | test recall | test precision | test F1 | golden recall | golden precision | speed (CPU) | size |
+|---|---|---|---|---|---|---|---|
+| regex baseline | 0.236 | 0.920 | 0.375 | 0.760 | 1.000 | 4 µs | — |
+| **model A** | **0.986** | **0.973** | **0.980** | **0.880** | 0.846 | 250 µs | 1.1 MB |
+
+What this teaches:
+- **Learning beats rules:** misses on test dropped from 2,192 to 41.
+- **No overfitting:** train recall 0.990 vs test 0.986 — the model isn't just
+  memorising its training rows.
+- **But test ≠ real life.** Test F1 0.98, golden F1 0.86. The test split comes
+  from the same template generator as training; golden doesn't. Golden misses:
+  - *data gaps* — never seen in training: fork bomb `:(){ :|:& };:` (0 examples),
+    `git stash clear` (0), `kubectl delete namespace` (11 examples).
+  - *shortcut learning* — false alarms on `cat /etc/hosts` (0.94),
+    `echo $PATH` (0.86), `tar -czf …` (0.69), `rm -rf node_modules` (0.69).
+    In training, 90% of commands with `/etc/` and 83% with `echo` are dangerous,
+    so the model learned "`/etc/` ⇒ danger" instead of what the command does.
+  - Top "dangerous" slices it learned: `' > '`, `'-f'`, `' -r'`, `'*.'` — partly
+    real signal, partly template artefacts.
+- **Don't fix it by tuning on golden.** If we tweak until golden passes, golden
+  stops being an honest exam. Fixes must come from better *training* data or
+  a better model (B, C), checked against golden afterwards.
+
+Tests (written first, `tests/test_model_a.py`): learns a 10-row toy set;
+output is `{label, probability}` with label = probability ≥ 0.5; save→load gives
+identical predictions; trained model's test recall beats the baseline's
+(read from committed `results/*.json`).
 
 ### Step 6 — Model B: frozen base model (bge-small embeddings + logistic regression) ⏳
 
