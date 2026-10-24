@@ -144,3 +144,19 @@ Step 8 a-d landed; threshold (8e) and wiring pending owner choice.
 - Open: golden tests require all 48 correct; A gets 41. Options: xfail(strict) the known misses with reasons, or keep red.
 Next: set threshold in model_a, wire shellguard.predict -> model_a, resolve golden test policy, then step 9 CLI.
 <!-- /dolly:step 0008 -->
+
+<!-- dolly:step 0009 -->
+## 0009 · 2026-10-24T16:38:17Z · @rjshrjndrn
+
+- task status: working
+- files: none
+
+Shell-aware features for model A (owner insight: space has meaning in shell).
+- tokens.py: shell_tokens via shlex(posix=False, punctuation_chars="();<>|&\n", whitespace " \t\r", wordchars=all printable except space/quotes/punct, commenters=""). Tags cmd:/flag:/arg:/op:, q: prefix for quoted data, except bash/sh -c, eval, and "$(...)"/backticks in double quotes (code). Comments dropped at word start. Wrappers sudo/xargs/env/... -> next word is cmd. Bare $ -> arg:$. newline -> op:;. Unbalanced quote -> err:unbalanced + whitespace split. shell_features adds neighbour pairs (module-level so joblib can pickle it).
+- Known tokenizer shortcut: posix=False splits --data="a b" into two words.
+- model_a: make_union(char 2-5 lowercase=False, TfidfVectorizer(analyzer=shell_features)) + LogisticRegression(max_iter=2000). 149,125 features, 4.5 MB, ~611 us/cmd (was 268).
+- Variant comparison (same split): A test F1 .966 309 wrong; A1 case only .966; A2 +shell .975; A3 +pairs .977 213 wrong. Exams flat (15->16 wrong). OOF @.35: 300/2090 -> 200/1353.
+- Motivating cases barely moved: rm -rf ~/ .cache 0.69 == ~/.cache 0.69; branch -D 0.49 vs -d 0.50; grep "rm -rf" fixed 0.39->0.15. Cause: training data has 0 stray-space rows, 4 branch -D, 2 branch -d (all dangerous). Unit test proves the features CAN learn -D vs -d from 6 rows.
+- New OOF threshold table: .50 518/573, .40 268/1014, .35 200/1353, .30 124/1783, .25 87/2446.
+Next: owner picks threshold; then wire shellguard.predict, xfail known golden misses, re-score. Data follow-up for the motivating cases (stray space, branch -D/-d, mention vs execution).
+<!-- /dolly:step 0009 -->

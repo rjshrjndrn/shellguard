@@ -6,16 +6,16 @@ status: working
 owner: rjshrjndrn
 collaborators: [rjshrjndrn]
 tags: []
-steps: 8
+steps: 9
 spec_version: 2
 created: 2026-10-24T12:58:38Z
-updated: 2026-10-24T15:59:26Z
+updated: 2026-10-24T16:38:17Z
 ---
 
 # df2cfsfz · shellguard: dangerous shell command classifier
 
 <!-- dolly:header -->
-`working` · spec v2 · @rjshrjndrn · 8 steps · updated 2026-10-24 15:59Z
+`working` · spec v2 · @rjshrjndrn · 9 steps · updated 2026-10-24 16:38Z
 <!-- /dolly:header -->
 
 ## Spec
@@ -69,4 +69,6 @@ Plan complete. Status → todo.
   full: `steps.md#0007`
 - `2026-10-24 15:59Z` @rjshrjndrn: Second dataset cut exam misses (A 11->4, C 8->5) for more false alarms. Mac froze training C: MPS default limit is 9.7 GB on 8 GB; capped at 0.6. Picked A (ties C, 90x faster, 40x smaller). Threshold table ready.
   full: `steps.md#0008`
+- `2026-10-24 16:38Z` @rjshrjndrn: Shell-aware tokens (shlex roles, quoted=data, case kept, pairs) cut model A test mistakes by a third; exams flat. The stray-space and -D/-d cases did not move: training data has 0 and 6 examples. Features can express them, data must teach them.
+  full: `steps.md#0009`
 
