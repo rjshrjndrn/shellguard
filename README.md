@@ -325,12 +325,70 @@ output is `{label, probability}` with label = probability ≥ 0.5; save→load g
 identical predictions; trained model's test recall beats the baseline's
 (read from committed `results/*.json`).
 
-### Step 6 — Model B: frozen base model (bge-small embeddings + logistic regression) ⏳
+### Step 6 — Model B: frozen base model (bge-small embeddings + logistic regression) ✅
 
-Uses a pretrained model, `BAAI/bge-small-en-v1.5` (33M parameters, 64 MB), via
-`fastembed` (ONNX, CPU). It turns each command into 384 numbers that capture
-meaning. We do **not** change it; we only train a logistic regression on top.
-Measured earlier: ~3.5 ms per command, CPU.
+```bash
+make train MODEL=model_b   # 265 s on M1 CPU, 1.3 GB RAM → models/model_b_head.joblib (2 KB)
+make eval  MODEL=model_b   # → results/model_b.json
+```
+
+Code: `src/shellguard/model_b.py`.
+
+```
+"git clean -fdx"
+   │ 1. bge-small-en-v1.5  (pretrained by BAAI, 33M weights, FROZEN — we never change it)
+   │    run with fastembed = ONNX Runtime, forced to CPUExecutionProvider
+   ▼
+[0.02, -0.11, …]  384 numbers, length 1 ("embedding" = the command's meaning as a point in space)
+   │ 2. LogisticRegression(max_iter=1000)   ← the ONLY part we train: 384 weights + 1
+   ▼
+P(dangerous)
+```
+
+- **Base model**: `BAAI/bge-small-en-v1.5`, downloaded once by fastembed into
+  `models/fastembed/` (64 MB, git-ignored). It was trained by someone else on
+  huge amounts of English text to put similar-meaning sentences close together.
+- **Frozen** = its 33M weights are used as-is. Training only fits the 385
+  numbers of the logistic regression on top ("the head"). That's *transfer
+  learning*: reuse knowledge, train a tiny bit.
+- **CPU-only, enforced**: this Mac also offers CoreML; we pass
+  `providers=["CPUExecutionProvider"]` and a test asserts the ONNX session uses
+  only that.
+- Shipping B means shipping **two** files: the 64 MB base model + the 2 KB head.
+
+**Result:**
+
+| | test recall | test precision | test F1 | golden F1 | golden wrong | speed (CPU) | size | train time |
+|---|---|---|---|---|---|---|---|---|
+| regex | 0.236 | 0.920 | 0.375 | 0.864 | 6 | 4 µs | — | — |
+| **A** no base | **0.986** | **0.973** | **0.980** | **0.863** | 7 | **250 µs** | **1.1 MB** | **2.4 s** |
+| **B** frozen base | 0.916 | 0.872 | 0.893 | 0.792 | 11 | 5,575 µs | 64 MB | 265 s |
+
+**B loses to A on every number.** My hypothesis ("meaning will fix the `/etc/`
+false alarm") was wrong — data said no. Why:
+
+```
+bge-small similarity (1.0 = identical meaning):
+  "rm -rf /"        vs "rm -rf ./build"   0.91   ← wipe the disk vs. routine cleanup
+  "git clean -fdx"  vs "git clean -n"     0.84   ← irreversible vs. dry run
+  "rm -rf /"        vs "ls -la"           0.61
+```
+
+- bge-small learned *English sentence* meaning. Shell danger lives in **tiny
+  details** — one path, one flag. To the base model, `rm -rf /` and
+  `rm -rf ./build` are "the same sentence about deleting".
+- The embedding is a lossy squeeze into 384 numbers. Once the detail is
+  squeezed out, no head on top can get it back.
+- Model A reads raw character slices, so `-n`, `-fdx`, `/` vs `./build` stay visible.
+- Lesson: a bigger, "smarter" pretrained model is not automatically better.
+  It's better only if what it learned matches your task.
+
+What could make a base model win → **step 7**: *fine-tune* it, i.e. let our
+data change its weights so it learns that `/` vs `./build` matters.
+
+Tests (written first, `tests/test_model_b.py`, 6): ONNX session is CPU-only;
+embeddings are 384-wide unit vectors; learns the toy set; output shape; save→load
+identical; test recall beats the regex baseline.
 
 ### Step 7 — Model C: fine-tuned base model ⏳
 

