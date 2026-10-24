@@ -582,20 +582,80 @@ Neither passes every golden command. A's remaining golden mistakes:
 - false alarms: `rm -rf node_modules`, `cat /etc/hosts`, `echo $PATH`, `npm install`,
   `git push origin feature/login`, `curl -fsSL -o install.sh …` (download only)
 
-#### 8e. Threshold ⏳
+#### 8e. Shell-aware features for model A ✅
 
-The model outputs P(dangerous); the cut-off decides the label. Picked on
-**out-of-fold** predictions over the *training* set (5-fold: each command
-scored by a model that didn't train on it) — never on test or exams.
+**Problem (owner's insight):** in a shell, space has meaning — it ends an
+argument. Char n-grams see the space *character* but not the structure:
 
 ```
- threshold  recall   precision  missed  false alarms   (of 33,607 train commands)
-   0.50     0.953    0.949        857      919
-   0.40     0.974    0.919        464     1561
-   0.35     0.983    0.895        300     2090
-   0.30     0.988    0.867        212     2743
-   0.25     0.993    0.835        129     3558
-   0.20     0.997    0.797         63     4610
+rm -rf ~/ .cache   →  rm │ -rf │ ~/ │ .cache     ← deletes HOME
+rm -rf ~/.cache    →  rm │ -rf │ ~/.cache       ← deletes a cache
+```
+
+Model A also lowercased everything (`git branch -D` force-delete == `-d` safe
+delete) and couldn't tell quoted text (data) from code: `grep "rm -rf" x` only searches.
+
+**Fix:** `src/shellguard/tokens.py` — `shell_tokens(cmd)` splits like the shell
+(Python's `shlex`, with `| ; && ( <(` as separators) and tags each word by role:
+
+```
+'grep -rn "rm -rf" x | bash'  →  cmd:grep  flag:-rn  q:cmd:rm  q:flag:-rf  arg:x  op:|  cmd:bash
+                                              └── q: = inside quotes = data ──┘          └ new command after |
+```
+
+Rules (each one a test in `tests/test_tokens.py`, 19 cases):
+- first word, and the word after `| ; && || & ( $( <(` → `cmd:`; after `sudo`/`xargs`/`env`… too
+- `-x` → `flag:` (case kept), other words → `arg:`, `|` `>>` etc. → `op:`, newline → `op:;`
+- quoted text → its own tokens with `q:` prefix — **except** when the shell runs it:
+  `bash -c '…'`, `eval "…"`, and `"$(…)"` inside double quotes stay code
+- `# comment` dropped; unbalanced quote → `err:unbalanced` (no crash; 127 train commands have one)
+- `shell_features` adds neighbour pairs (`flag:-rf arg:~/`) so order counts
+
+Model A now = char n-grams (case kept) **+** shell tokens and pairs, one
+logistic regression over both. 149,125 features, 4.5 MB, ~0.6 ms/command.
+
+**Measured** — 4 variants, same data, same exams:
+
+| variant | test F1 | test missed / FA | exam missed / FA | train OOF @0.35 missed / FA | µs |
+|---|---|---|---|---|---|
+| A (before) | 0.966 | 160 / 149 | 4 / 11 | 300 / 2,090 | 268 |
+| A1 keep case | 0.966 | 165 / 142 | 4 / 10 | 274 / 2,018 | 265 |
+| A2 + shell tokens | 0.975 | 112 / 117 | 4 / 13 | 250 / 1,439 | 594 |
+| **A3 + shell tokens + pairs** ← shipped | **0.977** | **107 / 106** | 4 / 12 | **200 / 1,353** | 611 |
+
+- On the 8,402-command test set: **~1/3 fewer mistakes** (309 → 213).
+- At the planned 0.35 threshold: 1/3 fewer misses *and* 1/3 fewer false alarms.
+- On the 103 exam commands: no change (16 vs 15 wrong — noise at this size).
+- Case alone did almost nothing; the shell tokens did the work.
+
+**But the exact cases that motivated it barely moved:**
+
+```
+   before  after   command
+    0.70   0.69    rm -rf ~/ .cache          ← still same as ~/.cache (0.69)
+    0.50   0.49    git branch -D feature     ← still same as -d (0.50)
+    0.39   0.15    grep -rn "rm -rf" x       ← fixed: quoted = data
+```
+
+Why: the model can only learn what the data shows. Training data has **0**
+stray-space examples, **4** `branch -D` and **2** `branch -d` rows (all
+labelled dangerous). The features now *can* express these differences — a
+unit test proves the model learns `-D` ≠ `-d` from 6 examples — but the data
+doesn't teach it. Next lever = data, not features.
+
+#### 8f. Threshold ⏳
+
+Picked on **out-of-fold** predictions over the *training* set (5-fold: each
+command scored by a model that didn't train on it) — never on test or exams.
+Recomputed for the shell-aware model:
+
+```
+ threshold  catches  precision  missed  false alarms   (of 33,607 train commands)
+   0.50     97.1%    96.8%       518      573
+   0.40     98.5%    94.6%       268     1014
+   0.35     98.9%    93.0%       200     1353     ← proposed
+   0.30     99.3%    91.0%       124     1783
+   0.25     99.5%    88.0%        87     2446
 ```
 
 Lower threshold = fewer misses, more false alarms. Pending owner's choice.

@@ -63,3 +63,9 @@ def shell_tokens(command: str) -> list[str]:
         else:
             out.append(f"arg:{w}")
     return out
+
+
+def shell_features(command: str) -> list[str]:
+    """Tokens plus neighbour pairs, so order counts: "flag:-rf arg:~/" is its own feature."""
+    t = shell_tokens(command)
+    return t + [f"{a} {b}" for a, b in zip(t, t[1:])]

@@ -61,3 +61,12 @@ def test_unbalanced_quote_does_not_crash():
 
     tokens = shell_tokens('echo "oops')
     assert tokens[0] == "err:unbalanced"
+
+
+def test_shell_features_add_neighbour_pairs():
+    # pairs keep order: "flag:-rf arg:~/" (wipe home) vs "flag:-rf arg:~/.cache"
+    from shellguard.tokens import shell_features
+
+    assert shell_features("rm -rf ~/") == [
+        "cmd:rm", "flag:-rf", "arg:~/", "cmd:rm flag:-rf", "flag:-rf arg:~/",
+    ]

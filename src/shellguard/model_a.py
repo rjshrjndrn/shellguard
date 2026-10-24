@@ -1,7 +1,8 @@
 """Model A - no base model. Learns everything from our data, in seconds, on CPU.
 
-  "git clean -fdx" -> char n-grams ("gi", "it", ..., "-fdx")    TfidfVectorizer
-                   -> one weight per n-gram, summed, squashed    LogisticRegression
+  "git clean -fdx" -> char n-grams ("gi", "it", ..., "-fdx")             TfidfVectorizer
+                   + shell tokens ("cmd:git", "flag:-fdx", pairs)         TfidfVectorizer
+                   -> one weight per feature, summed, squashed            LogisticRegression
                    -> P(dangerous) in [0, 1]
 """
 from pathlib import Path
@@ -10,10 +11,11 @@ import duckdb
 import joblib
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
-from sklearn.pipeline import Pipeline, make_pipeline
+from sklearn.pipeline import Pipeline, make_pipeline, make_union
 
 from shellguard.data import ROOT
 from shellguard.prepare import OUT_DIR
+from shellguard.tokens import shell_features
 
 MODEL_PATH = ROOT / "models" / "model_a.joblib"
 _model: Pipeline | None = None
@@ -21,9 +23,14 @@ _model: Pipeline | None = None
 
 def train(commands: list[str], labels: list[str]) -> Pipeline:
     model = make_pipeline(
-        # "char" (not "char_wb") so n-grams span spaces: "-rf /", "| sh", "of=/dev"
-        TfidfVectorizer(analyzer="char", ngram_range=(2, 5), min_df=2, sublinear_tf=True),
-        LogisticRegression(max_iter=1000),
+        make_union(
+            # "char" (not "char_wb") so n-grams span spaces: "-rf /", "| sh", "of=/dev".
+            # lowercase=False: git branch -D (force) is not -d (safe)
+            TfidfVectorizer(analyzer="char", ngram_range=(2, 5), min_df=2, sublinear_tf=True, lowercase=False),
+            # what the shell makes of it: arguments, quoted data, command starts
+            TfidfVectorizer(analyzer=shell_features, min_df=2, sublinear_tf=True, lowercase=False),
+        ),
+        LogisticRegression(max_iter=2000),
     )
     return model.fit(commands, labels)
 
@@ -49,6 +56,6 @@ if __name__ == "__main__":
     df = duckdb.read_parquet(str(OUT_DIR / "train.parquet")).fetchdf()
     model = train(df.command.tolist(), df.label.tolist())
     save(model)
-    n = len(model[0].vocabulary_)
-    print(f"trained on {len(df)} commands, {n} n-gram features -> {MODEL_PATH} "
+    n = sum(len(v.vocabulary_) for _, v in model[0].transformer_list)
+    print(f"trained on {len(df)} commands, {n} features -> {MODEL_PATH} "
           f"({MODEL_PATH.stat().st_size / 1e6:.1f} MB)")

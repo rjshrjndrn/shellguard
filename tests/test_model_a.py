@@ -34,6 +34,16 @@ def test_output_shape(toy_model):
     assert (out["label"] == "dangerous") == (out["probability"] >= 0.5)
 
 
+def test_case_matters():
+    # git branch -D force-deletes, -d refuses on unmerged work; lowercasing would merge them
+    from shellguard.model_a import predict, train
+
+    m = train([f"git branch -D {b}" for b in "abc"] + [f"git branch -d {b}" for b in "abc"],
+              ["dangerous"] * 3 + ["safe"] * 3)
+    assert predict("git branch -D z", m)["label"] == "dangerous"
+    assert predict("git branch -d z", m)["label"] == "safe"
+
+
 def test_save_and_load_give_identical_predictions(toy_model, tmp_path):
     from shellguard.model_a import load, predict, save
 

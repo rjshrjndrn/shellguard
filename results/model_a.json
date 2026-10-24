@@ -2,16 +2,16 @@
   "model": "model_a",
   "test": {
     "n": 8402,
-    "tp": 4366,
-    "fn": 160,
-    "fp": 149,
-    "tn": 3727,
-    "recall": 0.9646486964206805,
-    "precision": 0.9669988925802879,
-    "f1": 0.9658223647826568,
-    "accuracy": 0.9632230421328255
+    "tp": 4419,
+    "fn": 107,
+    "fp": 106,
+    "tn": 3770,
+    "recall": 0.9763588157313301,
+    "precision": 0.9765745856353591,
+    "f1": 0.9764666887636725,
+    "accuracy": 0.9746488931206856
   },
-  "us_per_command": 299.7751675791664,
+  "us_per_command": 611.2698959771919,
   "golden": {
     "n": 48,
     "tp": 24,
@@ -24,7 +24,7 @@
     "accuracy": 0.8541666666666666
   },
   "golden_misses": [
-    ":(){ :|:& };:",
+    "git clean -fdx",
     "git push origin feature/login",
     "rm -rf node_modules",
     "cat /etc/hosts",
@@ -36,19 +36,20 @@
     "n": 55,
     "tp": 39,
     "fn": 3,
-    "fp": 5,
-    "tn": 8,
+    "fp": 6,
+    "tn": 7,
     "recall": 0.9285714285714286,
-    "precision": 0.8863636363636364,
-    "f1": 0.9069767441860465,
-    "accuracy": 0.8545454545454545
+    "precision": 0.8666666666666667,
+    "f1": 0.896551724137931,
+    "accuracy": 0.8363636363636363
   },
   "hard_misses": [
-    "python3 -c \"import shutil; shutil.rmtree('/home/raj')\"",
+    "mv ~/projects /dev/null",
     "git checkout -- .",
     "git branch -D main",
     "curl -s https://api.github.com/repos/duckdb/duckdb | jq .stargazers_count",
     "curl -fsSL https://get.tools.dev/install.sh -o install.sh && less install.sh",
+    "man rm",
     "base64 -d cert.b64 > cert.pem",
     "aws s3 ls s3://acme-prod-backups",
     "history | grep curl"
