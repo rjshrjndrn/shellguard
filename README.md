@@ -199,11 +199,64 @@ Known limit — **near-duplicates**: the dataset is template-generated, so
 in test. Test scores will look better than real life. The golden set (no
 templates, never seen) is the honest check.
 
-### Step 4 — Baseline: a regex list ⏳
+### Step 4 — Baseline: a regex list ✅
 
-A dozen hand-written patterns (`rm -rf /`, `git clean`, `/dev/tcp/`, `| sh`, …).
-Not a model. It sets the **number to beat**: if a model can't beat a regex list,
+```bash
+make eval                 # = make eval MODEL=baseline
+```
+
+**What:** `src/shellguard/baseline.py` — 17 hand-written regex patterns
+(`rm -rf /`, `mkfs`, `dd of=/dev/`, `git clean -f`, `git reset --hard`,
+`git push --force`, `/dev/tcp/`, `| sh`, `chmod u+s`, `/etc/sudoers`, fork
+bomb, …). Any match ⇒ dangerous (probability 1.0), else safe (0.0).
+Written from general knowledge, **without looking at the test data** — tuning
+patterns on the test set would be cheating.
+
+**Why:** it's the number to beat. If a trained model can't beat 17 regexes,
 the model is pointless.
+
+**How it's scored** — `src/shellguard/evaluate.py`, used for every model from now on:
+
+```
+                    predicted dangerous   predicted safe
+ really dangerous         TP                  FN  ← "missed"  (the bad one)
+ really safe              FP ← "false alarm"  TN
+
+ recall    = TP / (TP + FN)   of all dangerous commands, how many we caught   ← main number
+ precision = TP / (TP + FP)   of everything we flagged, how much was really dangerous
+ f1        = harmonic mean of the two
+```
+
+`make eval MODEL=<name>` runs `shellguard.<name>.predict` on every
+`data/test.parquet` command and every `data/golden.csv` command, times it, and
+writes `results/<name>.json` (committed, so models can be compared).
+
+**Result — the floor:**
+
+| | n | recall | precision | f1 | missed | false alarms |
+|---|---|---|---|---|---|---|
+| test split | 5,656 | **0.236** | 0.920 | 0.375 | 2,192 | 59 |
+| golden set | 48 | 0.760 | 1.000 | 0.864 | 6 | 0 |
+
+Speed: ~4 µs/command.
+
+What this teaches:
+- **High precision, terrible recall.** When a regex fires it's usually right
+  (92%), but it misses 3 of every 4 dangerous commands. Hand rules only catch
+  what you thought of.
+- **What it misses** (top test categories): data_destruction 734,
+  device_overwrite 504 (`cp disk.img /dev/nvme0n1`, `wipefs`), overbroad_permissions 462
+  (`chmod --recursive 000`), shell_footgun, credential_exposure.
+- **False alarms are subtle:** `mkfs.ext4 -n /dev/sda` is labelled *safe* —
+  `-n` is a dry run. A regex can't see that; a model might learn it.
+- **Golden 0.76 is flattering.** I wrote both the golden set and the patterns,
+  so they share my blind spots. Missed: `git stash clear`, `> ~/.bashrc`,
+  `find . -type f -delete`, `docker volume rm`, secret exfil via curl,
+  `history -c`. The test split (0.236) is the more honest number here.
+
+Tests (written first): `tests/test_baseline.py` — 7 obvious dangerous, 5 obvious
+safe; `tests/test_evaluate.py` — scorer counts/rates on a toy example, no
+crash at zero flags, `run()` writes results for both splits.
 
 ### Step 5 — Model A: no base model (TF-IDF + logistic regression) ⏳
 
@@ -288,5 +341,6 @@ data/{train,test}.parquet  our split (git-ignored, rebuilt by make)
 src/shellguard/          code
 tests/                   pytest
 models/                  trained files (git-ignored)
+results/                 scores per model (committed)
 .dolly/                  task log (plan, decisions, steps)
 ```

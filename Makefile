@@ -1,4 +1,6 @@
-.PHONY: help test data prepare
+.PHONY: help test data prepare eval
+
+MODEL ?= baseline
 
 help: ## list targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
@@ -11,3 +13,6 @@ data: ## download pinned dataset to data/raw/
 
 prepare: ## dedupe + label + split into data/{train,test}.parquet
 	uv run python -m shellguard.prepare
+
+eval: ## score MODEL (default baseline) on test split + golden set
+	uv run python -m shellguard.evaluate $(MODEL)
