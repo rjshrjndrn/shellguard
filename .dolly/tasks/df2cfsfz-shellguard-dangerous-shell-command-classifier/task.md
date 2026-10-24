@@ -6,16 +6,16 @@ status: working
 owner: rjshrjndrn
 collaborators: [rjshrjndrn]
 tags: []
-steps: 5
+steps: 6
 spec_version: 2
 created: 2026-10-24T12:58:38Z
-updated: 2026-10-24T13:29:54Z
+updated: 2026-10-24T13:37:33Z
 ---
 
 # df2cfsfz · shellguard: dangerous shell command classifier
 
 <!-- dolly:header -->
-`working` · spec v2 · @rjshrjndrn · 5 steps · updated 2026-10-24 13:29Z
+`working` · spec v2 · @rjshrjndrn · 6 steps · updated 2026-10-24 13:37Z
 <!-- /dolly:header -->
 
 ## Spec
@@ -63,4 +63,6 @@ Plan complete. Status → todo.
   full: `steps.md#0004`
 - `2026-10-24 13:29Z` @rjshrjndrn: Model A (char tf-idf + logreg, no base model): test recall 0.986 vs regex 0.236, 250us/cmd, 1.1MB. Golden F1 0.86: dataset shortcuts (/etc/, echo) and gaps (fork bomb, stash clear). Not tuned on golden.
   full: `steps.md#0005`
+- `2026-10-24 13:37Z` @rjshrjndrn: Model B (frozen bge-small + logreg) loses to A everywhere: test F1 0.893 vs 0.980, 5.6ms vs 0.25ms, 64MB. bge-small rates rm -rf / ~ rm -rf ./build at 0.91 similarity; the deciding detail is erased before the head.
+  files: `results/baseline.json` · full: `steps.md#0006`
 

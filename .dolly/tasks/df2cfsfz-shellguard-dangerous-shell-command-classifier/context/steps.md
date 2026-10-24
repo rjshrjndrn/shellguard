@@ -89,3 +89,20 @@ Lesson 5 (model A) landed.
 - Golden tests (tests/test_golden.py) still red: they import shellguard.predict, wired only in step 8 after choosing a model.
 Next: step 6 model B (frozen bge-small via fastembed + logreg). Hypothesis: semantic embeddings may reduce /etc/ shortcut false alarms but may lose exact-token signal like -fdx.
 <!-- /dolly:step 0005 -->
+
+<!-- dolly:step 0006 -->
+## 0006 · 2026-10-24T13:37:33Z · @rjshrjndrn
+
+- task status: working
+- files: `results/baseline.json`
+
+Lesson 6 (model B, frozen base) landed. Hypothesis refuted.
+- model_b.py: fastembed TextEmbedding("BAAI/bge-small-en-v1.5", cache_dir=models/fastembed, providers=["CPUExecutionProvider"]) cached via functools.cache; embed batch 256; LogisticRegression(max_iter=1000) head saved joblib (2 KB). Base model 64 MB in models/fastembed (gitignored).
+- CPU-only asserted: encoder().model.model.get_providers() == ["CPUExecutionProvider"] (CoreML present on this Mac, so must be explicit).
+- Train 265 s wall / 1043 s CPU, 1.27 GB RSS (embedding 22,624 cmds dominates).
+- Results: test recall 0.916 precision 0.872 F1 0.893 (241 missed, 387 FA); golden recall 0.84 precision 0.75 F1 0.792 (11 wrong); 5.6 ms/cmd single-call CPU.
+- vs A: worse everywhere (A: 0.986/0.973/0.980, golden 0.863, 250 us, 1.1 MB).
+- Root cause measured: bge-small cosine sim rm -rf / vs rm -rf ./build = 0.91; git clean -fdx vs git clean -n = 0.84. Sentence encoder erases the path/flag detail that decides danger; linear head can't recover it.
+- Did not try: MLP head, other encoders (code-specific like jina-code / CodeBERT). Possible but out of plan.
+Next: step 7 fine-tune bge-small (MPS for training allowed, export ONNX, CPU inference). 8 GB RAM risk. Key question to measure: does fine-tuning pull rm -rf / and rm -rf ./build apart, and does it beat A at all? If not, A ships.
+<!-- /dolly:step 0006 -->
