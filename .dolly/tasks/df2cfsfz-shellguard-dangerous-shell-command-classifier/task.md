@@ -6,16 +6,16 @@ status: working
 owner: rjshrjndrn
 collaborators: [rjshrjndrn]
 tags: []
-steps: 2
+steps: 3
 spec_version: 2
 created: 2026-10-24T12:58:38Z
-updated: 2026-10-24T13:15:14Z
+updated: 2026-10-24T13:17:48Z
 ---
 
 # df2cfsfz · shellguard: dangerous shell command classifier
 
 <!-- dolly:header -->
-`working` · spec v2 · @rjshrjndrn · 2 steps · updated 2026-10-24 13:15Z
+`working` · spec v2 · @rjshrjndrn · 3 steps · updated 2026-10-24 13:17Z
 <!-- /dolly:header -->
 
 ## Spec
@@ -57,4 +57,6 @@ Plan complete. Status → todo.
   full: `steps.md#0001`
 - `2026-10-24 13:15Z` @rjshrjndrn: make data downloads pinned HF parquet, sha256-verified. Real files hold 136,497 rows / 28,296 distinct commands (card stale); 13 commands carry conflicting labels for step 3.
   full: `steps.md#0002`
+- `2026-10-24 13:17Z` @rjshrjndrn: Prepared 28,280 labelled commands, split 22,624/5,656 at 50.7% dangerous. 16 golden commands were in the dataset verbatim; removed so the exam stays unseen. Template near-dupes still cross the split (known optimism).
+  full: `steps.md#0003`
 

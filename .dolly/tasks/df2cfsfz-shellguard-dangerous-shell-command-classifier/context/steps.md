@@ -37,3 +37,20 @@ Lesson 2 (download) landed.
 - duckdb added as runtime dep (used for data prep).
 Next: step 3 prepare (dedupe, label rule, conflict rule, stratified 80/20 split, disjointness test). Balance estimate ~14.4k/13.9k was from earlier wrong-card numbers; recompute.
 <!-- /dolly:step 0002 -->
+
+<!-- dolly:step 0003 -->
+## 0003 · 2026-10-24T13:17:48Z · @rjshrjndrn
+
+- task status: working
+- files: none
+
+Lesson 3 (prepare) landed. make prepare -> data/{train,test}.parquet.
+- SQL (DuckDB): GROUP BY command; label = dangerous if NOT bool_and(reversible) OR bool_or(risk_level in high/critical) (any copy dangerous wins; 13 conflicting cmds, all critical/high or irreversible anyway); categories = union; exclude golden commands; ORDER BY command for determinism.
+- sklearn train_test_split(test_size=0.2, stratify=label, random_state=42).
+- Result: 28,280 cmds (28,296 - 16 golden overlap). train 22,624 / test 5,656, both 50.7% dangerous.
+- Big catch: 16 of 48 golden commands appear verbatim in the dataset (git clean -fdx, rm -rf ~, ls -la, ...). Removed from train+test so golden stays an unseen exam.
+- Known limit, not fixed: template near-duplicates (git push -f origin main/develop) cross the split -> test metrics optimistic. Golden set is the honest check. Could do grouped split later if gap between test and golden is large.
+- Test perf: building union per parametrised case cost 15s; dict lookup -> 1.2s.
+- Deps added: scikit-learn, pandas.
+Next: step 4 regex baseline (set the floor), then step 5 model A.
+<!-- /dolly:step 0003 -->
