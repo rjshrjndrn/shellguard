@@ -6,16 +6,16 @@ status: working
 owner: rjshrjndrn
 collaborators: [rjshrjndrn]
 tags: []
-steps: 1
+steps: 2
 spec_version: 2
 created: 2026-10-24T12:58:38Z
-updated: 2026-10-24T13:13:08Z
+updated: 2026-10-24T13:15:14Z
 ---
 
 # df2cfsfz · shellguard: dangerous shell command classifier
 
 <!-- dolly:header -->
-`working` · spec v2 · @rjshrjndrn · 1 step · updated 2026-10-24 13:13Z
+`working` · spec v2 · @rjshrjndrn · 2 steps · updated 2026-10-24 13:15Z
 <!-- /dolly:header -->
 
 ## Spec
@@ -55,4 +55,6 @@ Plan complete. Status → todo.
 - `2026-10-24 13:10Z` @rjshrjndrn: status todo → working.
 - `2026-10-24 13:13Z` @rjshrjndrn: Golden set (48 real-looking cmds) is the spec; 48 golden tests red until a model exists. README documents every step, dataset pinned to HF commit 5e1283e.
   full: `steps.md#0001`
+- `2026-10-24 13:15Z` @rjshrjndrn: make data downloads pinned HF parquet, sha256-verified. Real files hold 136,497 rows / 28,296 distinct commands (card stale); 13 commands carry conflicting labels for step 3.
+  full: `steps.md#0002`
 
