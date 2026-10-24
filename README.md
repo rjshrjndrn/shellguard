@@ -35,7 +35,7 @@ false alarms over misses: we optimise **recall** on the dangerous class.
  ┌──────────────────────────── TRAIN (once, on a Mac M1) ───────────────────────────┐
  │                                                                                   │
  │  Hugging Face                                                                     │
- │  yannelli/cli-command-risk ──download──▶ data/raw/*.parquet   (124,923 rows)      │
+ │  yannelli/cli-command-risk ──download──▶ data/raw/*.parquet   (136,497 rows)      │
  │                                              │                                    │
  │                                   dedupe + label rule + split                     │
  │                                              ▼                                    │
@@ -97,7 +97,7 @@ Tests:
 Right now: 4 data tests pass, 48 golden tests **fail** (no model yet). That is
 correct — tests first, then code.
 
-### Step 2 — Download the dataset ⏳
+### Step 2 — Download the dataset ✅
 
 Source: <https://huggingface.co/datasets/yannelli/cli-command-risk>
 License: CC-BY-4.0. Pinned to commit `5e1283ed01fef1ebe7453feaaf058d9cd5767384`
@@ -120,12 +120,34 @@ reversible ✓. Two other datasets (`bash-datasets`, `ShellRisk-Bench`) label
 only malicious commands — 115 of 126 `rm -rf`/`dd`/`mkfs` rows there are
 labelled *safe*, so we don't use them.
 
-Planned command: `make data`.
+```bash
+make data   # runs: uv run python -m shellguard.data
+```
+
+What it does (`src/shellguard/data.py`): creates `data/raw/`, downloads the
+3 URLs above with Python's `urllib`. No Hugging Face library needed — it's
+just 3 HTTP downloads, 1.8 MB total.
+
+Tests (`tests/test_download.py`):
+- each file's sha256 equals the hash Hugging Face publishes for that commit
+  (proves we got the exact pinned bytes):
+  - `train.parquet` `c83a3bdf…`
+  - `validation.parquet` `a9015b5f…`
+  - `test.parquet` `b4e8335f…`
+- the 4 columns we need exist, and there are **136,497 rows** in total.
+
+Found while testing:
+- The dataset card says 124,923 rows / 25,702 commands. The real files have
+  **136,497 rows / 28,296 distinct commands**. The card is out of date;
+  we trust the files.
+- 13 commands have conflicting labels across their copies. Step 3 handles them.
+- DuckDB 2.0 removed `.fetchone()` on relations; use `.fetchall()`.
 
 ### Step 3 — Prepare: dedupe, label, split ⏳
 
 1. **Dedupe.** Each command appears up to 5× (once per shell: bash, zsh, sh,
-   dash, fish). 124,923 rows → 25,702 distinct commands. Keep one row per command.
+   dash, fish). 136,497 rows → 28,296 distinct commands. Keep one row per command.
+   13 commands have conflicting labels across copies — rule for those decided in step 3.
    Without this, the same command lands in train *and* test, and the score lies.
 2. **Label rule** (one line, the whole definition):
    ```
