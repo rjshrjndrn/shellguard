@@ -18,12 +18,19 @@ from shellguard.data import ROOT
 
 BASE_MODEL = "BAAI/bge-small-en-v1.5"
 MODEL_DIR = ROOT / "models" / "model_c"
-MAX_TOKENS = 64  # p99 of train commands is 40 tokens
+MAX_TOKENS = 128  # p99 is 136 tokens; chained commands often hide the danger at the end
 LABELS = ["safe", "dangerous"]  # index 1 = dangerous
 _loaded = None
 
 
-def finetune(commands, labels, epochs=2, lr=5e-5, batch_size=32, seed=42, log=None):
+def finetune(commands, labels, epochs=2, lr=5e-5, batch_size=16, seed=42, log=None):
+    import os
+
+    # PyTorch's default MPS limit is 1.7x the recommended working set (9.7 GB on an 8 GB M1),
+    # so it swaps the whole machine instead of raising OOM; it froze this Mac once.
+    # 0.6 = 3.4 GB here. Must be set before torch is first imported.
+    os.environ.setdefault("PYTORCH_MPS_HIGH_WATERMARK_RATIO", "0.6")
+    os.environ.setdefault("PYTORCH_MPS_LOW_WATERMARK_RATIO", "0.5")
     import torch
     from transformers import AutoModelForSequenceClassification, AutoTokenizer, get_linear_schedule_with_warmup
 
