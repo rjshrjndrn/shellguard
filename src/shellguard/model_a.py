@@ -18,6 +18,9 @@ from shellguard.prepare import OUT_DIR
 from shellguard.tokens import shell_features
 
 MODEL_PATH = ROOT / "models" / "model_a.joblib"
+# P(dangerous) at or above this -> "dangerous". Picked in step 8 on out-of-fold train
+# predictions: below 0.5 because a miss (irreversible loss) costs more than a false alarm.
+THRESHOLD = 0.35
 _model: Pipeline | None = None
 
 
@@ -49,7 +52,7 @@ def predict(command: str, model: Pipeline | None = None) -> dict:
     if model is None:
         model = _model = _model or load()
     p = float(model.predict_proba([command])[0][list(model.classes_).index("dangerous")])
-    return {"label": "dangerous" if p >= 0.5 else "safe", "probability": p}
+    return {"label": "dangerous" if p >= THRESHOLD else "safe", "probability": p}
 
 
 if __name__ == "__main__":
