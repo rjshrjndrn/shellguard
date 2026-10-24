@@ -6,16 +6,16 @@ status: working
 owner: rjshrjndrn
 collaborators: [rjshrjndrn]
 tags: []
-steps: 10
+steps: 11
 spec_version: 2
 created: 2026-10-24T12:58:38Z
-updated: 2026-10-24T16:51:05Z
+updated: 2026-10-24T17:03:52Z
 ---
 
 # df2cfsfz · shellguard: dangerous shell command classifier
 
 <!-- dolly:header -->
-`working` · spec v2 · @rjshrjndrn · 10 steps · updated 2026-10-24 16:51Z
+`working` · spec v2 · @rjshrjndrn · 11 steps · updated 2026-10-24 17:03Z
 <!-- /dolly:header -->
 
 ## Spec
@@ -73,4 +73,6 @@ Plan complete. Status → todo.
   full: `steps.md#0009`
 - `2026-10-24 16:51Z` @rjshrjndrn: Shipped model A at threshold 0.35 (no dangerous exam command missed) as shellguard.predict and a CLI: one JSON line, exit 0 safe / 1 dangerous / 2 usage. Suite green with 6 strict xfails. CLI startup 1.1 s, all import + model load.
   full: `steps.md#0010`
+- `2026-10-24 17:03Z` @rjshrjndrn: Tried tree-sitter-bash tokenizer: tie with shlex (test 51/271 vs 56/281, hard exam 1 miss vs 0). Kept shlex on main; work saved on branch tree-sitter-tokens for a future port.
+  files: `src/shellguard/tokens.py`, `tests/test_tokens.py`, `README.md` · full: `steps.md#0011`
 

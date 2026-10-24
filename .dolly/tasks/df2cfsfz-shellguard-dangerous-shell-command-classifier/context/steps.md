@@ -175,3 +175,18 @@ Steps 8f, 8g, 9 landed. Model A shipped with a CLI.
 - Startup 1.1 s: sklearn import 0.65 s, joblib.load 0.4 s, predict 0.6 ms. pandas unavoidable: sklearn/utils/fixes.py imports it if installed. duckdb import moved under model_a __main__.
 Next (owner-approved order): tree-sitter-bash features as a measured change; then training data for gaps. Possible later: JSON weight export (portable, skips sklearn startup).
 <!-- /dolly:step 0010 -->
+
+<!-- dolly:step 0011 -->
+## 0011 · 2026-10-24T17:03:52Z · @rjshrjndrn
+
+- task status: working
+- files: `src/shellguard/tokens.py`, `tests/test_tokens.py`, `README.md`
+
+Tree-sitter-bash tokenizer trial: tie, kept shlex on main.
+- Branch tree-sitter-tokens (commit 2e2dda8): tokens.py rewritten on tree-sitter 0.26 + tree-sitter-bash 0.25.1; 30 token tests pass incl. 11 new (--data="a b" one arg, $var as command name, $( as one op, backticks, heredoc to shell = code / to cat = data, for loops, functions, env assignment, export as cmd, syntax error flagged). 21 us/command, 0 crashes, 545 syntax-error commands on 42,009.
+- Numbers @0.35 (same split): test 51/271 vs shlex 56/281; OOF 194/1340 vs 200/1353; golden equal 0/6; hard 1/7 vs 0/8 (git branch -D main 0.37 -> 0.349 now missed; docker system df fixed).
+- Probes: cat heredoc 0.97 -> 0.67 (correct), others within 0.05.
+- Reason for tie: training data lacks heredocs/loops/obfuscation; char n-grams already cover the rest.
+- Decision (owner): keep shlex. Revisit tree-sitter when porting to another language (bindings exist) or after training data adds structure-dependent examples.
+Next: training data for known gaps, or JSON export for startup / portability.
+<!-- /dolly:step 0011 -->
