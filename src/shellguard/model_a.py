@@ -7,14 +7,12 @@
 """
 from pathlib import Path
 
-import duckdb
 import joblib
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline, make_pipeline, make_union
 
 from shellguard.data import ROOT
-from shellguard.prepare import OUT_DIR
 from shellguard.tokens import shell_features
 
 MODEL_PATH = ROOT / "models" / "model_a.joblib"
@@ -56,6 +54,10 @@ def predict(command: str, model: Pipeline | None = None) -> dict:
 
 
 if __name__ == "__main__":
+    import duckdb  # training only: keeps duckdb/pandas out of the CLI's startup
+
+    from shellguard.prepare import OUT_DIR
+
     df = duckdb.read_parquet(str(OUT_DIR / "train.parquet")).fetchdf()
     model = train(df.command.tolist(), df.label.tolist())
     save(model)

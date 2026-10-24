@@ -1,7 +1,7 @@
 [project]
 name = "shellguard"
 version = "0.1.0"
-description = "Add your description here"
+description = "Is this shell command dangerous? Small local classifier, CPU only."
 authors = [
     { name = "rjshrjndrn", email = "rjshrjndrn@gmail.com" }
 ]
@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.scripts]
-shellguard = "shellguard:main"
+shellguard = "shellguard.__main__:main"
 
 [build-system]
 requires = ["uv_build>=0.13.5,<0.14.0"]
