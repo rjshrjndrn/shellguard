@@ -27,8 +27,9 @@ Out: multi-command sessions/scripts, user intent or task context, auto-blocking 
 - [ ] No command string appears in both train and test (asserted by test)
 - [ ] Regex baseline recall/precision recorded as the floor
 - [ ] Models A, B, C each report recall, precision, F1 overall and per kind on the same test split
+- [ ] Every model's inference benchmarked CPU-only (GPU/MPS/CoreML disabled): latency per command, cold start, artefact size
 - [ ] Chosen model has higher recall on dangerous than the regex baseline, at a threshold picked from the precision/recall curve
-- [ ] shellguard "<cmd>" prints label + probability; CLI covered by a test
+- [ ] shellguard "<cmd>" prints label + probability on a CPU-only machine; CLI covered by a test
 - [ ] Each lesson = one commit with tests written first
 
 ## Changes
@@ -41,7 +42,8 @@ Out: multi-command sessions/scripts, user intent or task context, auto-blocking 
 - Dataset overlap (both use nl2bash, GTFOBins, Atomic Red Team) inflates scores. Mitigate: dedupe on normalised command before split.
 - Imbalance (~5% dangerous) makes accuracy meaningless. Mitigate: report recall/precision/F1, PR curve.
 - Same-source split overstates real-world performance (ShellRisk-Bench card says so). Mitigate: leave-one-source-out check.
-- 8 GB RAM limits model C. Mitigate: fine-tune bge-small (33M params), short seq len, small batch; fall back to frozen if OOM.
+- 8 GB RAM limits model C training. Mitigate: fine-tune bge-small (33M params), short seq len, small batch; fall back to frozen if OOM.
+- Inference is CPU-only on an unknown target. Mitigate: every model is benchmarked CPU-only; models B/C must export to ONNX; latency and size are part of model selection, not an afterthought.
 - Label boundary disputes (rm -rf ./build). Mitigate: written labelling rule in repo, golden set reviewed by owner.
 
 ## Test Plan
@@ -52,9 +54,11 @@ Manual: owner runs CLI on 10 commands of their own choosing and reviews top-20 m
 
 ## Open Questions
 
-- [ ] Python level: comfortable reading/writing Python, or explain code line by line?
-- [ ] Labelling rule confirm: dangerous = irreversible regardless of path (so rm -rf ./build and rm -rf node_modules are dangerous too)?
+- [ ] Python level: (a) comfortable (b) can read, not write much (c) new?
+- [ ] Labelling rule: strict (rm -rf ./build, node_modules = dangerous) or rebuildable-exception?
 - [ ] git push --force, git reset --hard, curl ... | sh, sudo <anything>: dangerous?
+- [ ] Integration target: language/runtime (pi extension = Node/TS? Go? Python?), CPU arch (x86_64/arm64), RAM, latency budget per command
+- [ ] Call pattern: one process per command (cold start matters) or long-running service?
 
 ## Q&A
 
@@ -73,4 +77,8 @@ Manual: owner runs CLI on 10 commands of their own choosing and reviews top-20 m
 **Q (2026-10-24 12:58Z):** Where does the code live?
 
 **A:** New repo ~/Documents/projects/personal/shellguard (git init done, dolly store local).
+
+**Q (2026-10-24 13:01Z):** Where must the model run?
+
+**A:** Inference must run on CPU only: the integration target may have no GPU. Training may use the M1. Measured on M1 CPU: TF-IDF+logreg 215 us/cmd; bge-small ONNX CPU embedding 3.5 ms/cmd, 64 MB model.
 
