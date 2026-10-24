@@ -9,13 +9,13 @@ tags: []
 steps: 0
 spec_version: 1
 created: 2026-10-24T12:58:38Z
-updated: 2026-10-24T13:01:39Z
+updated: 2026-10-24T13:07:19Z
 ---
 
 # df2cfsfz · shellguard: dangerous shell command classifier
 
 <!-- dolly:header -->
-`planning` · spec v1 · @rjshrjndrn · 0 steps · updated 2026-10-24 13:01Z
+`planning` · spec v1 · @rjshrjndrn · 0 steps · updated 2026-10-24 13:07Z
 <!-- /dolly:header -->
 
 ## Spec

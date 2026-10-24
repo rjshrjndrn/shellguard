@@ -10,7 +10,7 @@ Learn to build small focused models from zero. Build a classifier: give it a she
 
 ## Problem
 
-Coding agents (pi) and humans run shell commands that can attack the system or irreversibly destroy local data (git clean -fdx, rm -rf, dd of=/dev/..). Public datasets (bash-datasets, ShellRisk-Bench) label only malicious commands; 115 of 126 destructive-pattern rows in bash-datasets are labelled safe, so no off-the-shelf data covers the destructive half. Owner also has zero ML experience and wants to learn to build small focused models.
+Coding agents (pi) and humans run shell commands that can attack the system or irreversibly destroy local data (git clean -fdx, rm -rf, dd of=/dev/..). Owner has zero ML experience and wants to learn to build small focused models. Data: bash-datasets and ShellRisk-Bench label only malicious commands (115 of 126 destructive-pattern rows in bash-datasets are labelled safe). yannelli/cli-command-risk (HF, CC-BY-4.0, 2026-10) labels both, with a reversible flag.
 
 ## Goal
 
@@ -18,8 +18,8 @@ A local CLI classifies a single shell command as dangerous or safe with a probab
 
 ## Scope
 
-In: single-line commands; labels dangerous/safe plus kind (malicious|destructive) for analysis; datasets bash-datasets + ShellRisk-Bench, deduplicated across both; hand-written and templated destructive examples; regex baseline; 3 models; evaluation; CLI.
-Out: multi-command sessions/scripts, user intent or task context, auto-blocking hooks in pi (later task), LLM generative models (Qwen/Llama), cloud GPUs, Windows/PowerShell commands.
+In: single-line commands; label dangerous/safe derived from cli-command-risk (risk_level + reversible), keep category for error analysis; dedupe by command (dataset repeats each command across 5 shells) and re-split ourselves; hand-written golden set as a separate real-world test; regex baseline; models A/B/C; CPU-only evaluation; CLI.
+Out: multi-command scripts, user intent/context, pi integration (later task), generative LLMs, cloud GPUs, Windows/PowerShell. bash-datasets/ShellRisk-Bench only if malicious recall is weak.
 
 ## Success Criteria
 
@@ -34,17 +34,15 @@ Out: multi-command sessions/scripts, user intent or task context, auto-blocking 
 
 ## Changes
 
-(guesses) pyproject.toml (uv), Makefile (test/train/eval), data/ (raw downloads gitignored, labelled splits), src/shellguard/{data,baseline,features,train,eval,cli}.py, tests/test_golden.py, tests/test_data.py, tests/test_cli.py, models/ (gitignored artefacts), docs/notes per lesson.
+(guesses) pyproject.toml (uv), Makefile (test/data/train/eval), data/raw (gitignored parquet downloads), data/golden.csv (hand-labelled, committed), src/shellguard/{data,baseline,train,evaluate,cli}.py, tests/test_golden.py, tests/test_data.py, tests/test_cli.py, models/ (gitignored artefacts), notes/ per lesson.
 
 ## Risks
 
-- Destructive labels are hand/template made: model may learn template artefacts, not danger. Mitigate: hold out hand-written examples as test only, inspect errors.
-- Dataset overlap (both use nl2bash, GTFOBins, Atomic Red Team) inflates scores. Mitigate: dedupe on normalised command before split.
-- Imbalance (~5% dangerous) makes accuracy meaningless. Mitigate: report recall/precision/F1, PR curve.
-- Same-source split overstates real-world performance (ShellRisk-Bench card says so). Mitigate: leave-one-source-out check.
-- 8 GB RAM limits model C training. Mitigate: fine-tune bge-small (33M params), short seq len, small batch; fall back to frozen if OOM.
-- Inference is CPU-only on an unknown target. Mitigate: every model is benchmarked CPU-only; models B/C must export to ONNX; latency and size are part of model selection, not an afterthought.
-- Label boundary disputes (rm -rf ./build). Mitigate: written labelling rule in repo, golden set reviewed by owner.
+- Synthetic data: commands use placeholders (<PATH>, example.com, RFC 5737 IPs); model may learn 'example.com = dangerous'. Mitigate: golden set of real-looking commands kept out of training; inspect errors.
+- Leakage: each command appears under 5 shells and 22 commands span the shipped splits. Mitigate: dedupe on command, re-split, assert disjoint by test.
+- Label noise: dataset itself is inconsistent at the edge (find . -name *.o -delete irreversible, rm -rf ./build reversible). Mitigate: written label rule, review top errors, golden set decides disputes.
+- 8 GB RAM limits model C training. Mitigate: fine-tune bge-small (33M), short seq len, small batch; fall back to frozen if OOM.
+- Inference CPU-only on unknown target. Mitigate: benchmark every model with GPU/MPS/CoreML off; B/C must export to ONNX; latency and size count in model choice.
 
 ## Test Plan
 
@@ -54,11 +52,10 @@ Manual: owner runs CLI on 10 commands of their own choosing and reviews top-20 m
 
 ## Open Questions
 
-- [ ] Python level: (a) comfortable (b) can read, not write much (c) new?
-- [ ] Labelling rule: strict (rm -rf ./build, node_modules = dangerous) or rebuildable-exception?
-- [ ] git push --force, git reset --hard, curl ... | sh, sudo <anything>: dangerous?
-- [ ] Integration target: language/runtime (pi extension = Node/TS? Go? Python?), CPU arch (x86_64/arm64), RAM, latency budget per command
-- [ ] Call pattern: one process per command (cold start matters) or long-running service?
+- [x] Python level: (a) comfortable
+- [x] Dataset: use yannelli/cli-command-risk, add golden set by hand
+- [x] Integration target / call pattern: deferred until model exists
+- [ ] Confirm label rule: dangerous = NOT reversible OR risk_level in (high, critical). Gives ~14.4k dangerous / ~13.9k safe, roughly balanced.
 
 ## Q&A
 
@@ -81,4 +78,16 @@ Manual: owner runs CLI on 10 commands of their own choosing and reviews top-20 m
 **Q (2026-10-24 13:01Z):** Where must the model run?
 
 **A:** Inference must run on CPU only: the integration target may have no GPU. Training may use the M1. Measured on M1 CPU: TF-IDF+logreg 215 us/cmd; bge-small ONNX CPU embedding 3.5 ms/cmd, 64 MB model.
+
+**Q (2026-10-24 13:07Z):** Python level?
+
+**A:** (a) comfortable. Explain ML concepts, not Python syntax.
+
+**Q (2026-10-24 13:07Z):** Build our own dataset or use existing?
+
+**A:** Existing first. Exa found yannelli/cli-command-risk (HF, CC-BY-4.0, 25,702 distinct commands, risk_level safe..critical + reversible flag + categories). It covers destructive AND malicious and its labels match the owner's probes: git clean -fdx / git reset --hard / git push -f = irreversible; rm -rf ./build and node_modules = low, reversible; rm -rf ~ and / = critical. bash-datasets + ShellRisk-Bench only label malicious, so they become extra malicious data at most. Own work = hand-written golden set, not a whole dataset.
+
+**Q (2026-10-24 13:07Z):** Integration target and call pattern?
+
+**A:** Deferred: build the model first, decide integration later. Constraint kept: inference CPU-only.
 
