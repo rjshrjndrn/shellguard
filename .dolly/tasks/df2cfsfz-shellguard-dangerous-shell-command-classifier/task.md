@@ -6,16 +6,16 @@ status: working
 owner: rjshrjndrn
 collaborators: [rjshrjndrn]
 tags: []
-steps: 3
+steps: 4
 spec_version: 2
 created: 2026-10-24T12:58:38Z
-updated: 2026-10-24T13:17:48Z
+updated: 2026-10-24T13:21:34Z
 ---
 
 # df2cfsfz · shellguard: dangerous shell command classifier
 
 <!-- dolly:header -->
-`working` · spec v2 · @rjshrjndrn · 3 steps · updated 2026-10-24 13:17Z
+`working` · spec v2 · @rjshrjndrn · 4 steps · updated 2026-10-24 13:21Z
 <!-- /dolly:header -->
 
 ## Spec
@@ -59,4 +59,6 @@ Plan complete. Status → todo.
   full: `steps.md#0002`
 - `2026-10-24 13:17Z` @rjshrjndrn: Prepared 28,280 labelled commands, split 22,624/5,656 at 50.7% dangerous. 16 golden commands were in the dataset verbatim; removed so the exam stays unseen. Template near-dupes still cross the split (known optimism).
   full: `steps.md#0003`
+- `2026-10-24 13:21Z` @rjshrjndrn: Regex floor set: 17 patterns give test recall 0.236 / precision 0.920, golden 0.76 (flattering, same author). Shared scorer writes results/<model>.json for every model.
+  full: `steps.md#0004`
 

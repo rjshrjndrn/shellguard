@@ -54,3 +54,20 @@ Lesson 3 (prepare) landed. make prepare -> data/{train,test}.parquet.
 - Deps added: scikit-learn, pandas.
 Next: step 4 regex baseline (set the floor), then step 5 model A.
 <!-- /dolly:step 0003 -->
+
+<!-- dolly:step 0004 -->
+## 0004 · 2026-10-24T13:21:34Z · @rjshrjndrn
+
+- task status: working
+- files: none
+
+Lesson 4 (regex baseline + scorer) landed.
+- baseline.py: 17 regexes, IGNORECASE, any match -> dangerous p=1.0. Written without looking at test data.
+- evaluate.py: score() hand-rolled tp/fn/fp/tn/recall/precision/f1/accuracy (dangerous = positive); run(name) imports shellguard.<name>.predict, scores test.parquet + golden.csv, times us/command over test, writes results/<name>.json (committed dir; moved from gitignored models/).
+- make eval MODEL=baseline.
+- FLOOR: test recall 0.236 precision 0.920 f1 0.375 (missed 2192, FA 59); golden recall 0.760 precision 1.0 (6 misses: git stash clear, > ~/.bashrc, find -type f -delete, docker volume rm, aws creds | curl, history -c); ~4 us/cmd.
+- Golden baseline is flattering (same author as golden). Test split is the honest number for baseline.
+- Misses by category: data_destruction 734, device_overwrite 504, overbroad_permissions 462, shell_footgun 236, credential_exposure 222.
+- Dataset nuance: mkfs.* -n / -N (dry run) labelled safe -> regex false alarms. Some labels look noisy: "yes sample > ./node_modules/.cache/test.img" dangerous.
+Next: step 5 model A (TF-IDF char n-grams + logistic regression). Must export to a CPU-only artefact; plan JSON weights or joblib first, decide in step 8.
+<!-- /dolly:step 0004 -->
