@@ -645,6 +645,23 @@ labelled dangerous). The features now *can* express these differences — a
 unit test proves the model learns `-D` ≠ `-d` from 6 examples — but the data
 doesn't teach it. Next lever = data, not features.
 
+#### 8e′. Tried: a real bash grammar (tree-sitter) — kept shlex ✅
+
+Swapped `shlex` for `tree-sitter-bash` (real grammar, 21 µs/command, 0 crashes
+on all 42,009 commands). Same split, same threshold 0.35:
+
+| | test missed / FA | train OOF missed / FA | golden missed / FA | hard missed / FA |
+|---|---|---|---|---|
+| **shlex** (kept) | 56 / 281 | 200 / 1,353 | 0 / 6 | 0 / 8 |
+| tree-sitter | 51 / 271 | 194 / 1,340 | 0 / 6 | 1 / 7 |
+
+A tie. It parses heredocs right (`cat <<EOF rm -rf ~` 0.97 → 0.67, only prints;
+`bash <<EOF …` stays 0.94, runs it), but training data has almost no heredocs,
+loops or obfuscation for the better structure to matter. Rule was "keep only if
+numbers improve", so main keeps shlex (no compiled dependencies, half the code).
+The work lives on git branch `tree-sitter-tokens`, for when shellguard is ported
+to Node/Go/Rust (tree-sitter has bindings there; shlex quirks would be hard to copy).
+
 #### 8f. Threshold ✅ → 0.35
 
 Candidates came from **out-of-fold** predictions over the *training* set
