@@ -143,28 +143,61 @@ Found while testing:
 - 13 commands have conflicting labels across their copies. Step 3 handles them.
 - DuckDB 2.0 removed `.fetchone()` on relations; use `.fetchall()`.
 
-### Step 3 — Prepare: dedupe, label, split ⏳
+### Step 3 — Prepare: dedupe, label, split ✅
+
+```bash
+make prepare   # runs: uv run python -m shellguard.prepare
+```
+
+Code: `src/shellguard/prepare.py` — one SQL query (DuckDB) + one scikit-learn call.
+
+```
+data/raw/*.parquet  136,497 rows
+   │ 1. GROUP BY command               → 28,296 commands
+   │ 2. drop golden commands           → 28,280   (16 golden cmds were in the data!)
+   │ 3. label rule                     → 14,341 dangerous / 13,939 safe
+   │ 4. train_test_split(stratify, seed=42)
+   ▼
+data/train.parquet  22,624 commands  50.7% dangerous
+data/test.parquet    5,656 commands  50.7% dangerous
+```
 
 1. **Dedupe.** Each command appears up to 5× (once per shell: bash, zsh, sh,
-   dash, fish). 136,497 rows → 28,296 distinct commands. Keep one row per command.
-   13 commands have conflicting labels across copies — rule for those decided in step 3.
-   Without this, the same command lands in train *and* test, and the score lies.
-2. **Label rule** (one line, the whole definition):
+   dash, fish). `GROUP BY command` keeps one row per command. Without this the
+   same command lands in train *and* test, and the score lies.
+2. **Drop golden commands.** 16 of the 48 golden commands (`git clean -fdx`,
+   `rm -rf ~`, `ls -la`, …) appear word-for-word in the dataset. If the model
+   trained on them, the golden exam would be an open-book exam. They are removed.
+3. **Label rule** — the whole definition:
    ```
-   dangerous = (reversible == False) OR risk_level in {high, critical}
+   dangerous = (any copy not reversible) OR (any copy is high/critical)
    ```
-   - `not reversible` catches destructive commands.
+   - `not reversible` catches destructive commands (`rm -rf /tmp/*`).
    - `high/critical` catches malicious ones the dataset marks reversible
-     (e.g. adding a user to `wheel`).
-   - Expected: ~14.4k dangerous, ~13.9k safe — roughly balanced.
-3. **Ignore the dataset's own split.** 22 commands appear in more than one of
-   its train/validation/test files. We re-split ourselves.
-4. **Split** 80% train / 20% test, *stratified* (same dangerous/safe ratio in
-   both), fixed random seed so it is repeatable.
-5. **Write** `data/train.parquet`, `data/test.parquet`.
+     (`sudo usermod --append --groups wheel admin`).
+   - "any copy": 13 commands disagree across their copies (e.g. `chmod +s /bin/bash`
+     is reversible in one shell, not in another). We take the most dangerous
+     reading — misses are worse than false alarms.
+   - `categories` = union of all copies' categories, kept for error analysis only.
+4. **Our own split.** The dataset's own train/validation/test files are ignored
+   (22 commands sit in more than one). `train_test_split(test_size=0.2,
+   stratify=label, random_state=42)`:
+   - *stratify* = both parts get the same dangerous/safe ratio (50.7%).
+   - *random_state* = fixed seed, so the split is identical every run. Rows are
+     sorted by command first, so input order can't change it either.
+5. **Write** `data/train.parquet`, `data/test.parquet` (git-ignored, rebuilt by `make prepare`).
 
-Tests (written first): train and test share no command; both classes present
-in both; label rule gives the expected label on hand-picked rows.
+Output columns: `command` (str), `label` (`dangerous`/`safe`), `categories` (list).
+
+Tests (`tests/test_prepare.py`, written first, 11 cases): exact columns; one row
+per command; train ∩ test = ∅; no golden command in either; 28,280 total;
+test = 20% ± 0.1%; same dangerous rate ± 0.5%; label rule on 4 hand-picked
+commands; two runs give identical splits.
+
+Known limit — **near-duplicates**: the dataset is template-generated, so
+`git push -f origin main` can be in train while `git push -f origin develop` is
+in test. Test scores will look better than real life. The golden set (no
+templates, never seen) is the honest check.
 
 ### Step 4 — Baseline: a regex list ⏳
 
