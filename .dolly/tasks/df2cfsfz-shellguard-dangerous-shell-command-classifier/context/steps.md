@@ -160,3 +160,18 @@ Shell-aware features for model A (owner insight: space has meaning in shell).
 - New OOF threshold table: .50 518/573, .40 268/1014, .35 200/1353, .30 124/1783, .25 87/2446.
 Next: owner picks threshold; then wire shellguard.predict, xfail known golden misses, re-score. Data follow-up for the motivating cases (stray space, branch -D/-d, mention vs execution).
 <!-- /dolly:step 0009 -->
+
+<!-- dolly:step 0010 -->
+## 0010 · 2026-10-24T16:51:05Z · @rjshrjndrn
+
+- task status: working
+- files: none
+
+Steps 8f, 8g, 9 landed. Model A shipped with a CLI.
+- 8f threshold 0.35 (THRESHOLD const in model_a). Shipped-model runs: 0.50 misses git clean -fdx (p=0.4999); 0.35 = 0 dangerous exam misses, test recall .988, 56 missed / 281 FA (was 107/106 at .5). Exams were looked at per-threshold -> no longer fully unseen for threshold choice; value matches train-OOF table.
+- 12 exam false alarms persist at every threshold (curl|jq 1.00, cat /etc/hosts .95, echo $PATH .84, base64 -d, aws s3 ls, man rm, history|grep curl, git push origin feature/login, npm install, curl -o, rm -rf node_modules). Cause: shell-safety 'ask' = dangerous; network/etc commands. Data fix only.
+- 8g src/shellguard/__init__.py re-exports model_a.predict. tests/test_golden.py: 6 strict xfails with reasons (KNOWN_MISTAKES dict) + test that the dict only names golden commands. make test all green: 136 passed, 6 xfailed.
+- 9 CLI src/shellguard/__main__.py: args joined by space or stdin (rstrip \n); one JSON line {command,label,probability}; exit 0 safe / 1 dangerous / 2 usage (stderr). pyproject script -> shellguard.__main__:main. tests/test_cli.py 7 cases incl. no duckdb/torch at startup.
+- Startup 1.1 s: sklearn import 0.65 s, joblib.load 0.4 s, predict 0.6 ms. pandas unavoidable: sklearn/utils/fixes.py imports it if installed. duckdb import moved under model_a __main__.
+Next (owner-approved order): tree-sitter-bash features as a measured change; then training data for gaps. Possible later: JSON weight export (portable, skips sklearn startup).
+<!-- /dolly:step 0010 -->
