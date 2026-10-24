@@ -22,5 +22,9 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "onnx>=1.23.2",
+    "onnxscript>=0.7.2",
     "pytest>=9.1.1",
+    "torch>=2.14.1",
+    "transformers>=5.20.2",
 ]
