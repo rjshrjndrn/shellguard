@@ -35,7 +35,7 @@ false alarms over misses: we optimise **recall** on the dangerous class.
  ┌──────────────────────────── TRAIN (once, on a Mac M1) ───────────────────────────┐
  │                                                                                   │
  │  Hugging Face                                                                     │
- │  yannelli/cli-command-risk ──download──▶ data/raw/*.parquet   (136,497 rows)      │
+ │  yannelli/cli-command-risk ──download──▶ data/raw/<dataset>/  (2 datasets)        │
  │                                              │                                    │
  │                                   dedupe + label rule + split                     │
  │                                              ▼                                    │
@@ -143,6 +143,14 @@ Found while testing:
 - 13 commands have conflicting labels across their copies. Step 3 handles them.
 - DuckDB 2.0 removed `.fetchone()` on relations; use `.fetchall()`.
 
+> **Update (step 8):** a second dataset was added —
+> [`tomngdev/shell-safety-v1.1`](https://huggingface.co/datasets/tomngdev/shell-safety-v1.1)
+> (MIT, pinned `fee89770c315d525ef2ee42adee6ef9725a7621e`, 3 JSONL files, 34,007 rows,
+> labels `allow`/`ask`/`deny`). Files now live in `data/raw/cli-command-risk/` and
+> `data/raw/shell-safety/`; `make data` downloads both, tests check all 6 hashes.
+> HF publishes a hash only for `train.jsonl`; the other two were hashed at first download.
+> Why it was added: see step 8.
+
 ### Step 3 — Prepare: dedupe, label, split ✅
 
 ```bash
@@ -198,6 +206,20 @@ Known limit — **near-duplicates**: the dataset is template-generated, so
 `git push -f origin main` can be in train while `git push -f origin develop` is
 in test. Test scores will look better than real life. The golden set (no
 templates, never seen) is the honest check.
+
+> **Update (step 8):** prepare now merges both datasets and excludes both exams:
+> ```
+> per-row verdict   cli-command-risk: dangerous = not reversible OR high/critical
+>                   shell-safety:     dangerous = deny OR ask      ← owner: "in doubt, dangerous"
+> per command       dangerous if ANY copy (any shell, either dataset) says dangerous
+> excluded          48 golden + 55 hard commands (31 of them were in the datasets)
+> result            42,009 commands, 53.9% dangerous → train 33,607 / test 8,402
+> ```
+> `ask` mixes risky (`curl … | python3`, `git push -f`) with routine (`docker pull`,
+> `npx playwright install`). Counting it dangerous trades false alarms for fewer
+> misses — the owner's call. 75 commands appear in both datasets with opposite
+> verdicts (e.g. `ln -sf /dev/null ~/.bash_history`: safe in one, deny in the other);
+> the any-copy rule makes them dangerous.
 
 ### Step 4 — Baseline: a regex list ✅
 
@@ -484,18 +506,99 @@ export is faithful); ONNX session is CPU-only; output shape; inference in a
 fresh process **never imports torch or transformers**; test recall beats regex.
 Found by the tests: `load()` crashed on a string path — fixed.
 
-### Step 8 — Evaluate and pick ⏳
+### Step 8 — Evaluate and pick 🔶 (threshold + wiring pending)
 
-On the same `data/test.parquet` for every model, with GPU/MPS/CoreML disabled:
-- **Recall** (of all dangerous commands, how many we caught) — the main number.
-- **Precision** (of all we flagged, how many were really dangerous).
-- **F1**, confusion matrix, recall per category (destructive vs malicious).
-- **Latency** per command, cold start, file size.
-- **Golden set**: must pass all 48.
-- **Threshold**: default cut is 0.5; we may lower it to trade false alarms for
-  fewer misses.
+#### 8a. A second exam: `data/hard.csv` ✅
 
-Winner = highest recall that passes the golden set, then smallest/fastest.
+The golden set covers mostly *direct* danger. 55 hand-written probes test the
+indirect kind — 42 dangerous, 13 safe lookalikes, columns `command,label,kind`:
+
+| kind | examples |
+|---|---|
+| rce | `bash <(curl …)`, `bash -c "$(curl …)"`, `curl … \| python3`, download → `chmod +x` → run |
+| obfuscated | `echo … \| base64 -d \| sh`, `printf '\x72\x6d…' \| bash`, `r=rm; f=-rf; $r $f ~/` |
+| indirect_delete | `ls \| xargs rm -rf`, `rsync --delete`, `shutil.rmtree`, `node -e rmSync`, `truncate -s 0 db` |
+| footgun | `rm -rf ~/ .cache` (stray space), `cd $DIR; rm -rf *` |
+| git | `git checkout -- .`, `git push origin :main`, `git branch -D main`, `reflog expire && gc` |
+| exfil / persist / cloud | `env \| curl -d @-`, cron + `curl\|sh`, `iptables -P INPUT DROP`, `aws s3 rm --recursive`, `FLUSHALL` |
+| lookalike (safe) | `grep -rn "rm -rf"`, `man rm`, `git clean -n`, `curl -o file && less file`, `aws s3 ls` |
+
+Never trained on. 8 of them were verbatim in the dataset → removed from train/test.
+`make eval` now reports test + golden + hard.
+
+#### 8b. Look for existing models/datasets on Hugging Face ✅
+
+Searched the HF API for models and datasets (shell/bash command, risk, safety, dangerous, classifier…).
+
+- **Models:** nothing better to reuse. Closest: `patronus-studio/cat-shell-risk-commander`
+  (also TF-IDF + logistic regression, JSON weights). On our exams it scored golden
+  37/48, hard 35/55 vs our A 41/48, 44/55; it misses `git clean -fdx` — its data is
+  mostly malicious, little destructive. Others were 3B LLMs, 150M ModernBERTs, or
+  had no card / 63% accuracy.
+- **Dataset:** `tomngdev/shell-safety-v1.1` covers our gaps (quiet git loss, DB
+  flushes, scp exfil, mention-vs-run) → added as a second source (see steps 2–3 updates).
+
+#### 8c. Retrain on both datasets ✅
+
+Same two exams, before (1 dataset) → after (2 datasets):
+
+| | golden misses | golden false alarms | hard misses | hard false alarms |
+|---|---|---|---|---|
+| A | 3 → **1** | 4 → 6 | 8 → **3** | 4 → 5 |
+| C | 3 → **1** | 1 → 4 | 5 → **4** | 4 → 5 |
+
+Fewer misses, more false alarms — exactly the "in doubt, dangerous" trade-off
+(`ask` → dangerous teaches the model that `npm install` and `curl -o` deserve a look).
+
+Test-split F1 dropped (A 0.978 → 0.966, C 0.986 → 0.975) because the test set
+itself changed — it now includes shell-safety's harder, chained commands. Not
+comparable across the change; the exams are.
+
+**Model C on 8 GB — the Mac froze and rebooted mid-training.** PyTorch's MPS
+allocator allows up to 1.7 × the recommended working set by default — 9.7 GB on
+a machine with 8 GB — so it swaps instead of failing. Fix: cap it
+(`PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.6` → 3.4 GB) so too-big becomes a clean
+OOM error; batch 32 → 16 to fit 128-token sequences under the cap. Training took
+32 min, flat at 2.34 GB.
+
+#### 8d. The pick ✅ → model A
+
+| after both datasets | test F1 | exam misses (golden+hard) | exam false alarms | speed (CPU) | size |
+|---|---|---|---|---|---|
+| regex | 0.323 | 41 | 0 | 6 µs | — |
+| **A** no base model | 0.966 | **4** | 11 | **~0.3 ms** | **3.1 MB** |
+| C fine-tuned | **0.975** | 5 | **9** | ~26 ms | 135 MB |
+| B frozen base | — | — | — | — | — |
+
+B was not retrained: it lost to A on every number in step 6.
+
+Rule set in advance: *highest recall, then smallest/fastest.* A has the most
+catches on the exams (golden tie, hard 39/42 vs 38/42) and is ~90× faster and
+~40× smaller. C has slightly better test F1 and fewer false alarms, but not
+enough to justify 135 MB and 26 ms. **A ships.**
+
+Neither passes every golden command. A's remaining golden mistakes:
+- missed: `:(){ :|:& };:` (fork bomb — still no training example)
+- false alarms: `rm -rf node_modules`, `cat /etc/hosts`, `echo $PATH`, `npm install`,
+  `git push origin feature/login`, `curl -fsSL -o install.sh …` (download only)
+
+#### 8e. Threshold ⏳
+
+The model outputs P(dangerous); the cut-off decides the label. Picked on
+**out-of-fold** predictions over the *training* set (5-fold: each command
+scored by a model that didn't train on it) — never on test or exams.
+
+```
+ threshold  recall   precision  missed  false alarms   (of 33,607 train commands)
+   0.50     0.953    0.949        857      919
+   0.40     0.974    0.919        464     1561
+   0.35     0.983    0.895        300     2090
+   0.30     0.988    0.867        212     2743
+   0.25     0.993    0.835        129     3558
+   0.20     0.997    0.797         63     4610
+```
+
+Lower threshold = fewer misses, more false alarms. Pending owner's choice.
 
 ### Step 9 — Package: CLI ⏳
 
