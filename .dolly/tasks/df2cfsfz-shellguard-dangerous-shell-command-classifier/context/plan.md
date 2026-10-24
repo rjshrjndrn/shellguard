@@ -95,3 +95,7 @@ Manual: owner runs CLI on 10 commands of their own choosing and reviews top-20 m
 
 **A:** Confirmed: dangerous = NOT reversible OR risk_level in (high, critical).
 
+**Q (2026-10-24 14:40Z):** shell-safety 'ask' label: dangerous or safe?
+
+**A:** Dangerous. Owner: in case of doubt, count as dangerous. Accepts more false alarms (ask includes routine cmds like docker pull) in exchange for catching ask-labelled risks like curl | python3 and git push -f.
+

@@ -6,16 +6,16 @@ status: working
 owner: rjshrjndrn
 collaborators: [rjshrjndrn]
 tags: []
-steps: 7
+steps: 8
 spec_version: 2
 created: 2026-10-24T12:58:38Z
-updated: 2026-10-24T14:09:39Z
+updated: 2026-10-24T15:59:26Z
 ---
 
 # df2cfsfz · shellguard: dangerous shell command classifier
 
 <!-- dolly:header -->
-`working` · spec v2 · @rjshrjndrn · 7 steps · updated 2026-10-24 14:09Z
+`working` · spec v2 · @rjshrjndrn · 8 steps · updated 2026-10-24 15:59Z
 <!-- /dolly:header -->
 
 ## Spec
@@ -67,4 +67,6 @@ Plan complete. Status → todo.
   files: `results/baseline.json` · full: `steps.md#0006`
 - `2026-10-24 14:09Z` @rjshrjndrn: Model C (fine-tuned bge-small, ONNX CPU): best golden F1 0.939 (3 wrong vs A's 7) and test F1 0.986, but 14 ms/cmd and 135 MB. Fixed 64-token padding kept MPS at 2.3 GB on 8 GB RAM. Confidently wrong on nc -e (0 training examples).
   full: `steps.md#0007`
+- `2026-10-24 15:59Z` @rjshrjndrn: Second dataset cut exam misses (A 11->4, C 8->5) for more false alarms. Mac froze training C: MPS default limit is 9.7 GB on 8 GB; capped at 0.6. Picked A (ties C, 90x faster, 40x smaller). Threshold table ready.
+  full: `steps.md#0008`
 

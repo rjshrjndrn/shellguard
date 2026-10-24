@@ -125,3 +125,22 @@ Lesson 7 (model C, fine-tuned bge-small) landed.
 - Warnings from dynamo exporter about axis names sharing constraints: harmless.
 Next: step 8 choose. Options: A (fast/tiny) vs C (better golden). Try int8 dynamic quantisation of C (onnxruntime.quantization.quantize_dynamic) to cut size/latency; tune threshold on a validation slice of TRAIN (not test, not golden); then wire shellguard.predict and turn golden tests green or document remaining misses. Data gaps (nc -e, git stash clear, /etc reads) are a candidate follow-up: add hand examples to TRAIN.
 <!-- /dolly:step 0007 -->
+
+<!-- dolly:step 0008 -->
+## 0008 · 2026-10-24T15:59:26Z · @rjshrjndrn
+
+- task status: working
+- files: none
+
+Step 8 a-d landed; threshold (8e) and wiring pending owner choice.
+- 8a data/hard.csv: 55 probes (42 dangerous, 13 safe lookalikes), kinds rce/obfuscated/indirect_delete/footgun/git/exfil/persist/cloud/lookalike. Excluded from train/test (8 verbatim overlaps). evaluate reports test+golden+hard. git branch -D main = dangerous (owner), dataset says low/reversible.
+- 8b HF search: patronus-studio/cat-shell-risk-commander (tfidf+logreg JSON) golden 37/48 hard 35/55 vs ours A 41/48 44/55; misses git clean -fdx. Others: 3B LLM, ModernBERT 150M, paiml 63% acc. Dataset tomngdev/shell-safety-v1.1 (MIT) added.
+- Second source: shell-safety pinned fee89770; deny/ask -> dangerous (owner: in doubt, dangerous), allow -> safe; any-copy rule across both sources; raw files moved to data/raw/<dataset>/. Pool 42,009 cmds (53.9% dangerous), train 33,607 / test 8,402.
+- Before->after on exams: A misses 11->4, FA 8->11; C misses 8->5, FA 5->9.
+- Model C crash: Mac froze + rebooted mid-training (boot failure count 1). PyTorch MPS default high watermark 1.7x recommended (5.73 GB) = 9.7 GB on 8 GB machine -> swaps instead of OOM. Fix: setdefault PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.6, LOW=0.5 (high alone rejected: "invalid low watermark ratio 1.4"). batch 32 OOMed at the cap with 128 tokens; batch 16 fits at 2.34 GB. MAX_TOKENS 64->128 (p99 136 tokens). 32 min training. Machine stalls periodically under load during training.
+- C inference now ~26 ms (was 13.5) on same hardware; cause not investigated (A unchanged at ~0.3 ms so CPU not throttled).
+- Pick: A (exam misses 4 vs 5, ~90x faster, ~40x smaller). B not retrained.
+- Threshold: 5-fold OOF on train: 0.50 rec .953 prec .949; 0.40 .974/.919; 0.35 .983/.895; 0.30 .988/.867; 0.25 .993/.835; 0.20 .997/.797. Waiting for owner.
+- Open: golden tests require all 48 correct; A gets 41. Options: xfail(strict) the known misses with reasons, or keep red.
+Next: set threshold in model_a, wire shellguard.predict -> model_a, resolve golden test policy, then step 9 CLI.
+<!-- /dolly:step 0008 -->
