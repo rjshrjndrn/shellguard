@@ -29,7 +29,8 @@ def test_run_writes_results_for_test_split_and_golden(tmp_path):
 
     run("baseline", out_dir=tmp_path)
     result = json.loads((tmp_path / "baseline.json").read_text())
-    for split in ("test", "golden"):
+    for split in ("test", "golden", "hard"):
         assert 0 <= result[split]["recall"] <= 1
     assert result["golden"]["n"] == 48
+    assert result["hard"]["n"] == 55
     assert result["us_per_command"] > 0

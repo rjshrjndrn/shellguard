@@ -1,5 +1,4 @@
-"""Score a model on the test split and the golden set; write results/<name>.json."""
-import csv
+"""Score a model on the test split and both exams (golden, hard); write results/<name>.json."""
 import importlib
 import json
 import sys
@@ -9,7 +8,7 @@ from pathlib import Path
 import duckdb
 
 from shellguard.data import ROOT
-from shellguard.prepare import GOLDEN, OUT_DIR
+from shellguard.prepare import GOLDEN, HARD, OUT_DIR, load_csv
 
 RESULTS_DIR = ROOT / "results"  # committed, so models can be compared over time
 
@@ -30,21 +29,21 @@ def score(truth: list[str], preds: list[str]) -> dict:
 def run(name: str, out_dir: Path = RESULTS_DIR) -> dict:
     predict = importlib.import_module(f"shellguard.{name}").predict
     test = duckdb.read_parquet(str(OUT_DIR / "test.parquet")).fetchdf()
-    with GOLDEN.open(newline="") as f:
-        golden = list(csv.DictReader(f))
 
     start = time.perf_counter()
     test_preds = [predict(c)["label"] for c in test.command]
     us = 1e6 * (time.perf_counter() - start) / len(test)
-    golden_preds = [predict(r["command"])["label"] for r in golden]
 
     result = {
         "model": name,
         "test": score(test.label.tolist(), test_preds),
-        "golden": score([r["label"] for r in golden], golden_preds),
-        "golden_misses": [r["command"] for r, p in zip(golden, golden_preds) if p != r["label"]],
         "us_per_command": us,
     }
+    for exam, path in (("golden", GOLDEN), ("hard", HARD)):
+        rows = load_csv(path)
+        preds = [predict(r["command"])["label"] for r in rows]
+        result[exam] = score([r["label"] for r in rows], preds)
+        result[f"{exam}_misses"] = [r["command"] for r, p in zip(rows, preds) if p != r["label"]]
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / f"{name}.json").write_text(json.dumps(result, indent=2))
     return result
@@ -52,9 +51,10 @@ def run(name: str, out_dir: Path = RESULTS_DIR) -> dict:
 
 if __name__ == "__main__":
     r = run(sys.argv[1])
-    for split in ("test", "golden"):
+    for split in ("test", "golden", "hard"):
         s = r[split]
         print(f"{split:6} n={s['n']:5}  recall={s['recall']:.3f}  precision={s['precision']:.3f}  "
               f"f1={s['f1']:.3f}  missed={s['fn']}  false_alarms={s['fp']}")
     print(f"speed  {r['us_per_command']:.1f} µs/command")
-    print("golden wrong:", *r["golden_misses"], sep="\n  ")
+    for exam in ("golden", "hard"):
+        print(f"{exam} wrong:", *r[f"{exam}_misses"], sep="\n  ")

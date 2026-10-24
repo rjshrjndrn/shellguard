@@ -6,7 +6,7 @@ Output: train.parquet and test.parquet with columns
 import duckdb
 import pytest
 
-from golden import load_golden
+from golden import load_golden, load_hard
 
 
 @pytest.fixture(scope="module")
@@ -36,17 +36,17 @@ def test_train_and_test_share_no_command(split):
     assert set(train.command).isdisjoint(test.command)
 
 
-def test_golden_commands_are_never_in_train_or_test(split):
-    # golden is the final exam; 16 of its commands appear verbatim in the dataset
+def test_exam_commands_are_never_in_train_or_test(split):
+    # golden and hard are exams; 16 golden + 8 hard commands appear verbatim in the dataset
     train, test = split
-    golden = {r["command"] for r in load_golden()}
-    assert golden.isdisjoint(train.command)
-    assert golden.isdisjoint(test.command)
+    exams = {r["command"] for r in load_golden() + load_hard()}
+    assert exams.isdisjoint(train.command)
+    assert exams.isdisjoint(test.command)
 
 
 def test_all_remaining_commands_are_kept(split):
     train, test = split
-    assert len(train) + len(test) == 28_296 - 16  # distinct commands minus golden overlap
+    assert len(train) + len(test) == 28_296 - 24  # distinct commands minus exam overlap
 
 
 def test_test_is_20_percent_and_stratified(split):

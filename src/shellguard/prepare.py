@@ -8,6 +8,8 @@ from sklearn.model_selection import train_test_split
 from shellguard.data import RAW_DIR, ROOT
 
 GOLDEN = ROOT / "data" / "golden.csv"
+HARD = ROOT / "data" / "hard.csv"
+EXAMS = (GOLDEN, HARD)  # hand-written exams: never trained on, never in test
 OUT_DIR = ROOT / "data"
 SEED = 42
 
@@ -20,16 +22,23 @@ SELECT command,
             THEN 'dangerous' ELSE 'safe' END AS label,
        list_sort(list_distinct(flatten(list(risk_categories)))) AS categories
 FROM read_parquet($raw)
-WHERE command NOT IN (SELECT unnest($golden::VARCHAR[]))  -- golden is the exam, never seen
+WHERE command NOT IN (SELECT unnest($exams::VARCHAR[]))  -- exams stay unseen
 GROUP BY command
 ORDER BY command  -- fixed order so the seeded split is repeatable
 """
 
 
+def load_csv(path: Path) -> list[dict]:
+    with path.open(newline="") as f:
+        return list(csv.DictReader(f))
+
+
+def exam_commands() -> list[str]:
+    return [r["command"] for path in EXAMS for r in load_csv(path)]
+
+
 def prepare(out_dir: Path = OUT_DIR) -> None:
-    with GOLDEN.open(newline="") as f:
-        golden = [r["command"] for r in csv.DictReader(f)]
-    df = duckdb.execute(LABELLED, {"raw": str(RAW_DIR / "*.parquet"), "golden": golden}).fetchdf()
+    df = duckdb.execute(LABELLED, {"raw": str(RAW_DIR / "*.parquet"), "exams": exam_commands()}).fetchdf()
     train, test = train_test_split(df, test_size=0.2, stratify=df.label, random_state=SEED)
 
     out_dir.mkdir(parents=True, exist_ok=True)
