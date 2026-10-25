@@ -2,20 +2,20 @@
 id: nf4y9gf5
 slug: check-shell-heredoc-bodies-as-scripts
 title: check shell heredoc bodies as scripts
-status: todo
+status: validating
 owner: rjshrjndrn
 collaborators: [rjshrjndrn]
 tags: []
-steps: 0
+steps: 1
 spec_version: 1
 created: 2026-10-25T17:03:32Z
-updated: 2026-10-25T17:03:32Z
+updated: 2026-10-25T17:18:31Z
 ---
 
 # nf4y9gf5 · check shell heredoc bodies as scripts
 
 <!-- dolly:header -->
-`todo` · spec v1 · @rjshrjndrn · 0 steps · updated 2026-10-25 17:03Z
+`validating` · spec v1 · @rjshrjndrn · 1 step · updated 2026-10-25 17:18Z
 <!-- /dolly:header -->
 
 ## Spec
@@ -34,4 +34,8 @@ bash/sh/zsh/dash (+ -s) reading a quoted heredoc: the body is a shell script but
 
 ## Log
 
-_no steps yet_
+- `2026-10-25 17:14Z` @rjshrjndrn: status todo → working.
+- `2026-10-25 17:18Z` @rjshrjndrn: Shell heredoc bodies are now split and checked like chains: rm -rf inside bash <<'EOF' is flagged 1.0 by rule, not by luck of the whole-command score. Text/python/bash file.sh/bash -c heredocs unchanged.
+  files: `src/shellguard/chain.py`, `src/shellguard/check.py`, `tests/test_chain.py`, `tests/test_check.py`, `README.md` · full: `steps.md#0001`
+- `2026-10-25 17:18Z` @rjshrjndrn: status working → validating. Run /reload in pi; try bash <<'EOF' with rm -rf inside - should flag the rm line at 1.0.
+
