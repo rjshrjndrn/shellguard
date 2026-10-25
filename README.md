@@ -18,8 +18,10 @@ from *that* point in time (later steps changed data and model), the
 
 ## Quick start
 
-Needs [uv](https://docs.astral.sh/uv/). The trained model A is committed, so it works
-right after cloning:
+Needs [uv](https://docs.astral.sh/uv/). Only the trained model A is committed
+(`src/shellguard/model_a.joblib`, 4.5 MB), because it is small; models B (64 MB base
+model) and C (129 MB) are not — rebuild them with `make train MODEL=model_b|model_c`.
+Model A is the one the CLI uses, so it works right after cloning:
 
 ```bash
 uv run shellguard "rm -rf ~"   # inside the repo
@@ -811,7 +813,7 @@ data/raw/<dataset>/      downloaded parquet + jsonl (git-ignored)
 data/{train,test}.parquet  our split (git-ignored, rebuilt by make)
 src/shellguard/          code; model_a.joblib lives here (committed, shipped in the wheel)
 tests/                   pytest (golden.py = shared exam loader)
-models/                  models B and C, fastembed cache (git-ignored)
+models/                  models B and C, fastembed cache (git-ignored: too big; only model A is committed)
 results/                 scores per model (committed)
 .dolly/                  task log (plan, decisions, steps)
 ```
