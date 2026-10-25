@@ -2,20 +2,20 @@
 id: ncg3c49w
 slug: shellguard-pi-hook-with-shared-daemon
 title: shellguard pi hook with shared daemon
-status: validating
+status: done
 owner: rjshrjndrn
 collaborators: [rjshrjndrn]
 tags: []
 steps: 12
 spec_version: 3
 created: 2026-10-25T09:11:26Z
-updated: 2026-10-25T10:58:59Z
+updated: 2026-10-25T11:03:02Z
 ---
 
 # ncg3c49w · shellguard pi hook with shared daemon
 
 <!-- dolly:header -->
-`validating` · spec v3 · @rjshrjndrn · 12 steps · updated 2026-10-25 10:58Z
+`done` · spec v3 · @rjshrjndrn · 12 steps · updated 2026-10-25 11:03Z
 <!-- /dolly:header -->
 
 ## Spec
@@ -80,4 +80,5 @@ Plan complete. Status → todo.
 - `2026-10-25 10:51Z` @rjshrjndrn: status working → validating. Restart pi or /reload. A long script ending in rm -rf on a scratch dir should now pop up naming the rm; the popup stays ~8 lines; echo $SOME_TOKEN pops up.
 - `2026-10-25 10:58Z` @rjshrjndrn: Trailing 2>&1 hid whole chains from the splitter (tree-sitter attaches it to the && list); rm -r /tmp/tester ran unprompted at 0.069. Last part now owns the redirect; real session command flags rm -r at 0.467.
   files: `src/shellguard/chain.py`, `tests/test_chain.py`, `tests/test_check.py`
+- `2026-10-25 11:03Z` @rjshrjndrn: status validating → done. User confirmed in pi: chain with rm -r flagged, popup and session allow work.
 
