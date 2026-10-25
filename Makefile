@@ -5,8 +5,9 @@ MODEL ?= baseline
 help: ## list targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
 
-test: ## run all tests
+test: ## run all tests (python + pi hook)
 	uv run pytest -q
+	node --test hooks/pi/*.test.ts
 
 data: ## download pinned dataset to data/raw/
 	uv run python -m shellguard.data
