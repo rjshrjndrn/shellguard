@@ -38,3 +38,23 @@ check(cmd, score=model) in src/shellguard/check.py -> {label, danger_probability
 Verified: "git add -A && git commit -m wip && git push --force" -> flagged push 0.985, add 0.844, commit 0.462.
 Next: step 3 daemon `shellguard serve` on ~/.cache/shellguard/sock using check().
 <!-- /dolly:step 0003 -->
+
+<!-- dolly:step 0004 -->
+## 0004 · 2026-10-25T09:33:30Z · @rjshrjndrn
+
+- task status: working
+- files: `src/shellguard/daemon.py`, `src/shellguard/__main__.py`, `tests/test_daemon.py`
+
+src/shellguard/daemon.py: serve(sock, model_path, idle=1800, poll=1, score) -> reason str.
+- Protocol: newline JSON, {"command": str} -> {"command", label, danger_probability, flagged}; bad request -> {"error"}; many lines per connection OK.
+- Single instance: fcntl.flock(<sock>.lock, EX|NB). Changed from plan (bind-as-lock): with bind, two clients both deleting a stale socket could delete a fresh one -> orphan daemon. Lock holder alone unlinks leftovers; kernel releases lock on death (kill -9 safe).
+- Dir 0700, socket 0600.
+- Watcher loop (poll s): socket (ino,mtime,size) changed -> "socket gone"; model file id changed/missing -> "model changed"; idle -> "idle". Then shutdown, unlink own socket, release lock.
+- Binds before loading model so early clients queue in backlog instead of respawning.
+- ThreadingUnixStreamServer + a lock around scoring.
+- CLI: `shellguard --serve [--socket P] [--idle S]` (flag, not subcommand, so a command named "serve" can still be checked).
+- request(sock, cmd, timeout) client helper (Python; used by tests).
+Measured: warm round trip 0.78-1.01 ms (Python client, 50 requests). 3 concurrent starts -> 1 daemon, 2 print "already running".
+Test gotcha: wait for connectable(), not sock.exists() (a leftover file exists before bind).
+Next: step 4 hooks/pi/decide.ts.
+<!-- /dolly:step 0004 -->
