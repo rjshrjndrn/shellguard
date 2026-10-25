@@ -85,3 +85,10 @@ export function render(menu: Menu): string[] {
     ...menu.options.map((o, i) => `${i === menu.selected ? "▸" : " "} ${o.label.padEnd(w)}  ${o.hint}`),
   ];
 }
+
+/** Reply to /shellguard <arg>: on/off confirm the switch, status (or bare) also lists session allows. */
+export function commandText(arg: string, enabled: boolean, allowed: Set<string>): string {
+  const state = `shellguard is ${enabled ? "on" : "off"}`;
+  if (arg === "on" || arg === "off" || !allowed.size) return state;
+  return `${state}\nallowed this session:\n${[...allowed].map((p) => `  ${p}`).join("\n")}`;
+}

@@ -15,7 +15,7 @@ import { matchesKey, truncateToWidth } from "@earendil-works/pi-tui";
 import { check } from "./client.ts";
 import { decide, remember } from "./decide.ts";
 import { type Choice, type Menu, press, render } from "./menu.ts";
-import { askMenu, failedMenu } from "./menu.ts";
+import { askMenu, commandText, failedMenu } from "./menu.ts";
 
 export default function (pi: ExtensionAPI) {
   let enabled = true;
@@ -80,11 +80,7 @@ export default function (pi: ExtensionAPI) {
       } else if (arg && arg !== "status") {
         return ctx.ui.notify("usage: /shellguard on | off | status", "warning");
       }
-      const list = [...allowed].map((p) => `  ${p}`).join("\n");
-      ctx.ui.notify(
-        `shellguard is ${enabled ? "on" : "off"}` + (allowed.size ? `\nallowed this session:\n${list}` : ""),
-        "info",
-      );
+      ctx.ui.notify(commandText(arg, enabled, allowed), "info");
     },
   });
 }

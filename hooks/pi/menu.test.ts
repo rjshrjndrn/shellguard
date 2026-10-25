@@ -10,7 +10,7 @@
 //     Deny                      d / esc
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { askMenu, failedMenu, press, render } from "./menu.ts";
+import { askMenu, commandText, failedMenu, press, render } from "./menu.ts";
 import type { Check } from "./decide.ts";
 
 const check: Check = {
@@ -142,4 +142,30 @@ test("short command (up to 3 lines) is still shown in full", () => {
   const lines = render(askMenu(c, c.flagged));
   for (const l of ["cd /tmp", "rm -rf build", "ls"]) assert.ok(lines.some((x) => x.trim() === l), l);
   assert.ok(!lines.some((l) => l.includes("command:")));
+});
+
+// /shellguard on | off | status: on/off just confirm the switch; status also lists session allows.
+const allowed = new Set(["rm -r /tmp/tester", "git push --force"]);
+
+test("off says only that shellguard is off, even with session allows", () => {
+  assert.equal(commandText("off", false, allowed), "shellguard is off");
+});
+
+test("on says only that shellguard is on", () => {
+  assert.equal(commandText("on", true, allowed), "shellguard is on");
+});
+
+test("status lists what was allowed this session", () => {
+  assert.equal(
+    commandText("status", true, allowed),
+    "shellguard is on\nallowed this session:\n  rm -r /tmp/tester\n  git push --force",
+  );
+});
+
+test("bare /shellguard behaves like status", () => {
+  assert.equal(commandText("", false, allowed), commandText("status", false, allowed));
+});
+
+test("status with nothing allowed is just the state", () => {
+  assert.equal(commandText("status", false, new Set()), "shellguard is off");
 });
