@@ -40,7 +40,8 @@ make prepare                 # merge + label + split → data/{train,test}.parqu
 make train MODEL=model_a     # ~5 s → src/shellguard/model_a.joblib
 make eval  MODEL=model_a     # test split + golden + hard → results/model_a.json
 make test                    # pytest, incl. building + installing the wheel
-uv tool install --force --python 3.12 .   # reinstall globally after retraining
+make install                 # reinstall the global CLI after retraining
+make hook-pi                 # + install the pi extension (see pi hook below)
 ```
 
 ---
@@ -796,7 +797,8 @@ What exists now:
    `src/shellguard/tokens.py`. joblib = pickle: only load files you built.
 2. **Python functions** — `from shellguard import predict` → `{"label", "danger_probability"}`;
    `from shellguard.check import check` → the same plus `flagged` (what the CLI prints).
-3. **A CLI** — `shellguard "<cmd>"` → one JSON line, exit 0/1/2.
+3. **A CLI** — `shellguard "<cmd>"` → one JSON line, exit 0/1/2; `shellguard --serve` → the daemon.
+4. **A pi hook** — `make hook-pi`; see [pi hook](#pi-hook).
 
 Current scores (`results/model_a.json`, threshold 0.35):
 
@@ -811,8 +813,63 @@ Tried and parked: **tree-sitter-bash** instead of `shlex` — a tie (8e′), on 
 
 Not a standalone binary. Not yet:
 - **portable format** — weights as JSON so Node/Go can run it without Python;
-- **fast startup** — ~1.1 s per call (scikit-learn import + model load);
+- **fast CLI startup** — ~1.1 s per call (scikit-learn import + model load); the pi
+  hook avoids it through the daemon (~1 ms);
+- **Claude Code hook** — the daemon socket is agent-neutral, only pi is wired up;
 - **training data** for the known gaps (stray space, `branch -D` vs `-d`, `curl`/`/etc` false alarms, fork bomb).
+
+---
+
+## pi hook
+
+Checks every bash command [pi](https://pi.dev) runs, before it runs.
+
+```bash
+make hook-pi     # installs the shellguard CLI (python 3.12) + copies hooks/pi/ to
+                 # ~/.pi/agent/extensions/shellguard/, then /reload in pi
+make unhook-pi   # removes the extension and stops the daemon
+```
+
+```
+ pi ──bash tool call──▶ hooks/pi/index.ts ──▶ client.ts ──unix socket──▶ shellguard --serve
+                              │                   │ nobody answers?       (shared daemon,
+                              │                   └─ spawn it detached     model loaded once)
+                              ▼                                             ~/.cache/shellguard/sock
+                        decide.ts:  safe → runs     dangerous → popup     failed → popup
+```
+
+A dangerous command stops and asks. Only the flagged parts of a chain are listed:
+
+```
+⚠ shellguard flagged a dangerous command (0.561)
+  cd /tmp/x && rm -rf /tmp/x/build && touch done
+  flagged:  rm -rf /tmp/x/build  0.814
+▸ Allow once              enter
+  Allow for this session  s
+  Deny                    d / esc          (arrows + enter work too)
+```
+
+- **Allow for this session** remembers the flagged parts (whitespace-insensitive). A later
+  command runs without asking only if *every* part it flags is already allowed; otherwise
+  the popup lists just the new parts.
+- **shellguard itself fails** (not installed, daemon won't start, 1 s timeout): popup
+  `⚠ shellguard failed: … Run anyway / Deny`.
+- **No UI** (`pi -p`): dangerous or failed commands are blocked; the reason goes to the
+  model, e.g. `shellguard flagged this command as dangerous: rm -rf /tmp/x (0.876)`.
+- `/shellguard off | on | status` — session only, resets when pi restarts. The status
+  bar shows `shellguard: off` while disabled.
+
+**The daemon** (`shellguard --serve`) makes a check ~1 ms instead of ~1.1 s (measured
+p50 0.84 ms from node; the CLI pays 0.7 s importing scikit-learn + 0.25 s loading the
+model for a 0.55 ms prediction). One daemon serves every pi session (~185 MB RSS).
+- started by the first session, detached; an `flock` on `sock.lock` keeps it to one
+- socket dir `0700`, socket `0600`: only your user can talk to it
+- exits by itself after 30 min idle, when the model file changes (`make train`,
+  reinstall), or when its socket is removed (`make unhook-pi`) — the next check
+  starts a fresh one
+
+Code: `src/shellguard/daemon.py`, `src/shellguard/check.py`, `src/shellguard/chain.py`,
+`hooks/pi/{index,client,decide,menu}.ts`. Tests: `make test` (pytest + `node --test`).
 
 ---
 
@@ -824,6 +881,7 @@ data/hard.csv            hand-labelled indirect-danger exam, 55 (committed)
 data/raw/<dataset>/      downloaded parquet + jsonl (git-ignored)
 data/{train,test}.parquet  our split (git-ignored, rebuilt by make)
 src/shellguard/          code; model_a.joblib lives here (committed, shipped in the wheel)
+hooks/pi/                pi extension (TypeScript), installed by make hook-pi
 tests/                   pytest (golden.py = shared exam loader)
 models/                  models B and C, fastembed cache (git-ignored: too big; only model A is committed)
 results/                 scores per model (committed)
