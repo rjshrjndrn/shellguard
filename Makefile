@@ -28,7 +28,7 @@ eval: ## score MODEL (default baseline) on test split + golden set
 	uv run python -m shellguard.evaluate $(MODEL)
 
 install: ## install the shellguard CLI globally (python 3.12)
-	uv tool install --force --python 3.12 .
+	uv tool install --force --compile-bytecode --python 3.12 .
 
 hook-pi: install ## install the pi extension into ~/.pi/agent/extensions/shellguard
 	rm -rf "$(PI_EXT)"

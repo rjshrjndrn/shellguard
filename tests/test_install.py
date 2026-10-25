@@ -29,3 +29,11 @@ def test_installed_cli_runs_outside_the_repo(installed):
     assert r.stderr == ""  # a crash also exits 1, so check this first
     assert r.returncode == 1
     assert json.loads(r.stdout)["label"] == "dangerous"
+
+
+def test_make_install_precompiles_bytecode():
+    # Without it the first import after a reinstall compiles ~1k .pyc files: measured
+    # 10.2 s vs 1.0 s, past the hooks' 5 s daemon start timeout ("daemon did not start").
+    r = subprocess.run(["make", "-n", "install"], cwd=ROOT, capture_output=True, text=True)
+    assert "uv tool install" in r.stdout
+    assert "--compile-bytecode" in r.stdout
