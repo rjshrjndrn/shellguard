@@ -7,6 +7,7 @@ import duckdb
 import pytest
 
 from golden import load_golden, load_hard
+from test_extra_data import load_extra
 
 
 @pytest.fixture(scope="module")
@@ -46,8 +47,21 @@ def test_exam_commands_are_never_in_train_or_test(split):
 
 def test_all_remaining_commands_are_kept(split):
     train, test = split
-    # 42,040 distinct across both sources, minus 31 exam commands
-    assert len(train) + len(test) == 42_009
+    # 42,040 distinct across both sources, minus 31 exam commands, plus data/extra.csv
+    assert len(train) + len(test) == 42_009 + len(load_extra())
+
+
+def test_extra_rows_keep_their_label(split):
+    # extra.csv rows land in train or test with the hand-written label
+    labels = {c: l for df in split for c, l in zip(df.command, df.label)}
+    for r in load_extra():
+        assert labels[r["command"]] == r["label"], r
+
+
+def test_extra_rows_are_tagged(split):
+    train, test = split
+    cats = {c: list(k) for df in split for c, k in zip(df.command, df.categories)}
+    assert all(cats[r["command"]] == ["extra"] for r in load_extra())
 
 
 def test_test_is_20_percent_and_stratified(split):

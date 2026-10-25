@@ -10,6 +10,8 @@ from shellguard.data import RAW_DIR, ROOT
 GOLDEN = ROOT / "data" / "golden.csv"
 HARD = ROOT / "data" / "hard.csv"
 EXAMS = (GOLDEN, HARD)  # hand-written exams: never trained on, never in test
+# hand-written rows that break token shortcuts in the raw data (~/, 2>&1); split like the rest
+EXTRA = ROOT / "data" / "extra.csv"
 OUT_DIR = ROOT / "data"
 SEED = 42
 
@@ -26,6 +28,9 @@ WITH rows AS (
     UNION ALL
     SELECT command, label IN ('deny', 'ask'), ['shell-safety:' || label]
     FROM read_json($shell_safety)
+    UNION ALL
+    SELECT command, label = 'dangerous', ['extra']
+    FROM read_csv($extra, all_varchar = true)
 )
 SELECT command,
        CASE WHEN bool_or(dangerous) THEN 'dangerous' ELSE 'safe' END AS label,
@@ -51,6 +56,7 @@ def prepare(out_dir: Path = OUT_DIR) -> None:
         "ccr": str(RAW_DIR / "cli-command-risk" / "*.parquet"),
         "shell_safety": str(RAW_DIR / "shell-safety" / "*.jsonl"),
         "exams": exam_commands(),
+        "extra": str(EXTRA),
     }
     df = duckdb.execute(LABELLED, params).fetchdf()
     train, test = train_test_split(df, test_size=0.2, stratify=df.label, random_state=SEED)
