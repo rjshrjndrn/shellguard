@@ -19,19 +19,34 @@ const ONCE: Option = { choice: "once", label: "Allow once", key: "", hint: "ente
 const SESSION: Option = { choice: "session", label: "Allow for this session", key: "s", hint: "s" };
 const DENY: Option = { choice: "deny", label: "Deny", key: "d", hint: "d / esc" };
 
-/** `parts` = flagged parts not yet allowed; the rest of check.flagged is shown as allowed. */
+const SHORT = 3; // commands up to this many lines are printed; longer ones are in the chat
+
+/** First line of a multi-line part, plus how many lines were left out. */
+function oneLine(part: string): { head: string; more: string } {
+  const lines = part.split("\n");
+  return { head: lines[0], more: lines.length > 1 ? `  (+${lines.length - 1} lines)` : "" };
+}
+
+/** `parts` = flagged parts not yet allowed; the rest of check.flagged is shown as allowed.
+ *  Height stays small whatever the command: long commands are not printed (pi shows them
+ *  in the chat above) and every flagged part is one line. */
 export function askMenu(check: Check, parts: Flagged[]): Menu {
-  const body = check.command.split("\n").map((l) => "  " + l);
+  const cmdLines = check.command.split("\n");
+  const short = cmdLines.length <= SHORT;
+  const body = short ? cmdLines.map((l) => "  " + l) : [];
   const isNew = new Set(parts.map((f) => f.part));
   const rows = [...parts, ...check.flagged.filter((f) => !isNew.has(f.part))];
   const isWhole = rows.length === 1 && rows[0].part === check.command;
-  if (!isWhole) {
-    const w = Math.max(...rows.map((f) => f.part.length));
+  if (!(isWhole && short)) {
+    const heads = rows.map((f) => oneLine(f.part));
+    const w = Math.max(...heads.map((h) => h.head.length));
     rows.forEach((f, i) => {
       const tag = isNew.has(f.part) ? "" : "  (allowed this session)";
-      body.push(`  ${i === 0 ? "flagged:" : "        "}  ${f.part.padEnd(w)}  ${f.danger_probability}${tag}`);
+      const label = i === 0 ? "flagged:" : "        ";
+      body.push(`  ${label}  ${heads[i].head.padEnd(w)}  ${f.danger_probability}${heads[i].more}${tag}`);
     });
   }
+  if (!short) body.push(`  command:  ${cmdLines.length} lines, shown in full in the chat above`);
   return {
     title: `⚠ shellguard flagged a dangerous command (${check.danger_probability})`,
     body,

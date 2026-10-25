@@ -100,3 +100,46 @@ test("multi-line commands are shown line by line", () => {
   const lines = render(askMenu(ml, ml.flagged));
   assert.ok(lines.some((l) => l.trim() === "rm -rf ~"));
 });
+
+// Long commands (scripts, heredocs) must not push the flagged parts and the options off
+// screen: the popup never prints more than SHORT lines of the command, and each flagged
+// part is one line with a (+N lines) note. pi shows the full command in the chat above.
+const script = (n: number) => ["python3 - <<'EOF'", ...Array.from({ length: n - 2 }, (_, i) => `x = ${i}`), "EOF"].join("\n");
+
+test("multi-line flagged part shows its first line and how many more", () => {
+  const part = script(28);
+  const c: Check = { ...check, command: `ls && ${part}`, flagged: [{ part, danger_probability: 0.688 }] };
+  const lines = render(askMenu(c, c.flagged));
+  assert.ok(lines.some((l) => /flagged:\s+python3 - <<'EOF'\s+0\.688\s+\(\+27 lines\)$/.test(l)), lines.join("\n"));
+  assert.ok(!lines.some((l) => l.includes("x = 5")));
+});
+
+test("long command is not printed; the popup says where to read it", () => {
+  const c: Check = { ...check, command: script(60), flagged: [{ part: "rm -rf build", danger_probability: 0.8 }] };
+  const lines = render(askMenu(c, c.flagged));
+  assert.ok(!lines.some((l) => l.includes("x = 5")));
+  assert.ok(lines.some((l) => /command:\s+60 lines, shown in full in the chat above/.test(l)), lines.join("\n"));
+});
+
+test("long command that is itself the only flagged part still names it once", () => {
+  const cmd = script(40);
+  const c: Check = { ...check, command: cmd, flagged: [{ part: cmd, danger_probability: 0.9 }] };
+  const lines = render(askMenu(c, c.flagged));
+  assert.equal(lines.filter((l) => l.includes("python3 - <<'EOF'")).length, 1, lines.join("\n"));
+  assert.ok(lines.some((l) => /\(\+39 lines\)/.test(l)));
+});
+
+test("popup height does not grow with the command", () => {
+  const h = (n: number) => {
+    const c: Check = { ...check, command: script(n), flagged: [{ part: script(n), danger_probability: 0.9 }, check.flagged[0]] };
+    return render(askMenu(c, c.flagged)).length;
+  };
+  assert.equal(h(4), h(300));
+});
+
+test("short command (up to 3 lines) is still shown in full", () => {
+  const c: Check = { ...check, command: "cd /tmp\nrm -rf build\nls", flagged: [{ part: "rm -rf build", danger_probability: 0.8 }] };
+  const lines = render(askMenu(c, c.flagged));
+  for (const l of ["cd /tmp", "rm -rf build", "ls"]) assert.ok(lines.some((x) => x.trim() === l), l);
+  assert.ok(!lines.some((l) => l.includes("command:")));
+});
