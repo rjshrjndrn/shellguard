@@ -6,16 +6,16 @@ status: working
 owner: rjshrjndrn
 collaborators: [rjshrjndrn]
 tags: []
-steps: 6
+steps: 7
 spec_version: 2
 created: 2026-10-25T09:11:26Z
-updated: 2026-10-25T09:46:08Z
+updated: 2026-10-25T09:55:51Z
 ---
 
 # ncg3c49w · shellguard pi hook with shared daemon
 
 <!-- dolly:header -->
-`working` · spec v2 · @rjshrjndrn · 6 steps · updated 2026-10-25 09:46Z
+`working` · spec v2 · @rjshrjndrn · 7 steps · updated 2026-10-25 09:55Z
 <!-- /dolly:header -->
 
 ## Spec
@@ -63,4 +63,6 @@ Plan complete. Status → todo.
   files: `hooks/pi/decide.ts`, `hooks/pi/decide.test.ts`, `Makefile`
 - `2026-10-25 09:46Z` @rjshrjndrn: client.ts: connects to the daemon socket, spawns it detached on ENOENT/ECONNREFUSED and retries (respawn every 1.5 s covers losing the lock to a shutting-down daemon). Warm p50 0.84 ms from node.
   files: `hooks/pi/client.ts`, `hooks/pi/client.test.ts`
+- `2026-10-25 09:55Z` @rjshrjndrn: pi extension works end to end in real pi: popup names only new flagged parts, s remembers them, arrows/esc deny, failure popup when shellguard is missing, /shellguard on|off|status, no-UI blocks with reason.
+  files: `hooks/pi/index.ts`, `hooks/pi/menu.ts`, `hooks/pi/menu.test.ts` · full: `steps.md#0007`
 

@@ -58,3 +58,24 @@ Measured: warm round trip 0.78-1.01 ms (Python client, 50 requests). 3 concurren
 Test gotcha: wait for connectable(), not sock.exists() (a leftover file exists before bind).
 Next: step 4 hooks/pi/decide.ts.
 <!-- /dolly:step 0004 -->
+
+<!-- dolly:step 0007 -->
+## 0007 · 2026-10-25T09:55:51Z · @rjshrjndrn
+
+- task status: working
+- files: `hooks/pi/index.ts`, `hooks/pi/menu.ts`, `hooks/pi/menu.test.ts`
+
+hooks/pi/index.ts wires: session_start (status + warm the daemon via check("true")), tool_call (bash only) -> client.check -> decide -> popup/block, /shellguard on|off|status with arg completions, status bar "shellguard: off" when disabled.
+hooks/pi/menu.ts: popup as data (askMenu, failedMenu, press(key), render) -> 11 node tests; index.ts adds theme colours + matchesKey + truncateToWidth.
+Imports @earendil-works/pi-coding-agent and pi-tui are provided by pi's loader (virtual modules) - no package.json needed.
+Type-checked index.ts against pi's real .d.ts with tsc 5 (strict) - 0 errors.
+Manual, real pi in tmux (/tmp/sgpi):
+- pi -p: daemon auto-spawned in ~/.cache/shellguard; command blocked, model read reason.
+- popup named only "rm -rf ..." in a 3-part chain; s -> ran; later chain with that part + "git reset --hard" -> popup listed only the reset (new part); Down Down Enter -> deny.
+- /shellguard status lists allowed parts; off -> flagged command ran with no popup, status bar shows "shellguard: off"; on -> popup back; Esc -> denied.
+- shellguard missing from PATH + daemon stopped -> "shellguard failed: cannot start shellguard ... ENOENT" popup; enter -> ran.
+Observed: pi waits for all tool_call hooks of a batch before executing, so an allowed call waits for its sibling's popup.
+Noise seen: "echo done" flagged 0.722 alongside rm -rf in -p mode (known short-part noise).
+Not measured inside pi: per-call latency; node client p50 0.84 ms is the bound (hook adds no I/O).
+Next: step 7 make hook-pi / unhook-pi + README.
+<!-- /dolly:step 0007 -->
