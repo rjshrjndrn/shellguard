@@ -65,6 +65,8 @@ from shellguard.chain import harmless  # noqa: E402
     "echo hi", 'echo "exit $?"', 'echo "removed (exit $?)"', "echo $?", "printf '%s\\n' ok",
     "true", "false", ":", "pwd", "cd /tmp", "ls -la /tmp", "test -f x", "[ -d x ]",
     "sleep 1", "which rm", "type ls", "[[ -n $x ]]",
+    # variables that don't look like secrets: the model is noisy on these
+    "echo $PATH", 'echo "built $VERSION"', 'test -f "$FILE"', '[ -d "$DIR" ]', 'cd "$PROJECT_DIR"',
 ])
 def test_harmless(part):
     assert harmless(part)
@@ -84,6 +86,10 @@ def test_harmless(part):
     "echo a; echo b",                   # one command only
     "echo 'unclosed",                   # invalid
     "[ -n \"$(rm -rf ~)\" ]",           # substitution inside a test
+    "echo $PASSWORD",                   # a secret-looking variable: printing it
+    "echo ${GITHUB_TOKEN}",             #   puts it in the agent's context
+    "printf %s $SECRET",
+    'echo "token=$API_TOKEN"',
     "",
 ])
 def test_not_harmless(part):

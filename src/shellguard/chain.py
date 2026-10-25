@@ -9,6 +9,8 @@ program's other children are the ; / newline separated statements. Everything el
 dropped since they never run. Parts are slices of the original text, so the hook shows
 and remembers what the agent actually wrote. Invalid bash stays whole: don't guess.
 """
+import re
+
 import tree_sitter_bash
 from tree_sitter import Language, Parser
 
@@ -42,6 +44,10 @@ HARMLESS = {"echo", "printf", "true", "false", ":", "pwd", "cd", "ls", "test", "
 # runs (LD_PRELOAD=evil.so ls)
 _UNSAFE = {"file_redirect", "heredoc_redirect", "herestring_redirect",
            "command_substitution", "process_substitution", "variable_assignment"}
+# printing a secret puts it in the agent's context (echo $GITHUB_TOKEN). In the dataset,
+# echo/printf of such a name is dangerous 34x, safe 1x; other names are mixed and the
+# model scores them noisily (echo $PATH 0.84), so only these names count.
+_SECRET_NAME = re.compile(r"TOKEN|SECRET|PASS|KEY|CRED|AUTH|PRIVATE|SESSION|COOKIE", re.I)
 
 
 def harmless(part: str) -> bool:
@@ -60,6 +66,8 @@ def harmless(part: str) -> bool:
     while stack:
         n = stack.pop()
         if n.type in _UNSAFE:
+            return False
+        if n.type == "variable_name" and _SECRET_NAME.search(n.text.decode()):
             return False
         stack.extend(n.named_children)
     return True

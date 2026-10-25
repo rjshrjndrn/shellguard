@@ -127,3 +127,25 @@ def test_real_session_flags_only_the_rm(cmd):
 def test_real_model_still_flags_echo_into_rc_file():
     out = check("echo x >> ~/.bashrc && ls")
     assert "echo x >> ~/.bashrc" in [f["part"] for f in out["flagged"]]
+
+
+# dangerous in the test split because they print a secret; the model catches all 8.
+# harmless() must not hide the ones that read a variable.
+SECRETS = ["echo $PASSWORD", "echo $AWS_SECRET_ACCESS_KEY", "echo -n $AWS_SECRET_ACCESS_KEY",
+           "echo -n $DB_PASSWORD", "echo $GITHUB_TOKEN", "printf %s $SECRET"]
+
+
+@pytest.mark.parametrize("cmd", SECRETS)
+def test_printing_a_secret_variable_is_flagged(cmd):
+    assert check(cmd)["label"] == "dangerous"
+
+
+# a literal placeholder looks exactly like echo of any other string: known miss
+@pytest.mark.xfail(strict=True, reason="literal string echo is harmless(); can't tell a key from text")
+@pytest.mark.parametrize("cmd", ['printf %s "<API_KEY>"', "printf '%s\\n' \"<API_KEY>\""])
+def test_printing_a_literal_key_placeholder(cmd):
+    assert check(cmd)["label"] == "dangerous"
+
+
+def test_exit_status_echo_stays_quiet():
+    assert check('rm -rf /tmp/tester; echo "exit $?"')["flagged"][0]["part"] == "rm -rf /tmp/tester"
