@@ -84,6 +84,12 @@ def test_test_is_20_percent_and_stratified(split):
         ("$env:COMPUTERNAME", "safe"),
         # in both sources, they disagree -> most dangerous reading wins
         ("git clean -fd", "dangerous"),  # cli-command-risk dangerous, shell-safety allow
+        # git rows follow the git rule in chain.py (shellguard.relabel), not the sources
+        ("git add . && git commit -m 'bump'", "safe"),  # raw: dangerous
+        ("git stash list", "safe"),                     # raw: dangerous
+        ("git push upstream feature/x", "dangerous"),   # raw: safe; every push asks
+        ("git branch -D old-work", "dangerous"),        # raw: safe
+        ("sudo git add id_rsa", "dangerous"),           # raw: safe; commits a key
         ("ln -sf /dev/null ~/.bash_history", "dangerous"),  # cli-command-risk safe, shell-safety deny
     ],
 )
@@ -101,3 +107,23 @@ def test_split_is_repeatable(tmp_path):
     for name in ("train.parquet", "test.parquet"):
         cmds = lambda d: duckdb.read_parquet(str(d / name)).fetchdf().command.tolist()
         assert cmds(a) == cmds(b)
+
+
+def test_git_relabel_is_counted_and_tagged(split):
+    # rows the git rule relabels keep a trace in categories, so the change is auditable
+    cats = {c: list(k) for df in split for c, k in zip(df.command, df.categories)}
+    assert "relabel:git" in cats["git stash list"]
+    assert "relabel:git" not in cats["git clean -fd"]  # raw label already agreed
+
+
+def test_git_relabel_moves_no_row_between_train_and_test(tmp_path, monkeypatch):
+    # only labels change: the split is the one the raw labels give, so results before
+    # and after the relabel are measured on the same test commands
+    import shellguard.prepare as prep
+
+    prep.prepare(out_dir=tmp_path / "with")
+    monkeypatch.setattr(prep, "git_label", lambda c: None)
+    prep.prepare(out_dir=tmp_path / "without")
+    for name in ("train.parquet", "test.parquet"):
+        cmds = lambda d: sorted(duckdb.read_parquet(str(d / name)).fetchdf().command)
+        assert cmds(tmp_path / "with") == cmds(tmp_path / "without")

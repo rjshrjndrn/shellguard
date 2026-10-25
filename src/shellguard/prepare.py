@@ -6,6 +6,7 @@ import duckdb
 from sklearn.model_selection import train_test_split
 
 from shellguard.data import RAW_DIR, ROOT
+from shellguard.relabel import git_label
 
 GOLDEN = ROOT / "data" / "golden.csv"
 HARD = ROOT / "data" / "hard.csv"
@@ -51,6 +52,20 @@ def exam_commands() -> list[str]:
     return [r["command"] for path in EXAMS for r in load_csv(path)]
 
 
+def relabel_git(df) -> int:
+    """Git rows follow the git rule in chain.py (see shellguard.relabel). Changed rows
+    get "relabel:git" in categories. In place, after the split, so no row moves
+    between train and test. Returns how many rows changed."""
+    changed = 0
+    for i, cmd in zip(df.index, df.command):
+        new = git_label(cmd)
+        if new is not None and new != df.at[i, "label"]:
+            df.at[i, "label"] = new
+            df.at[i, "categories"] = [*df.at[i, "categories"], "relabel:git"]
+            changed += 1
+    return changed
+
+
 def prepare(out_dir: Path = OUT_DIR) -> None:
     params = {
         "ccr": str(RAW_DIR / "cli-command-risk" / "*.parquet"),
@@ -60,6 +75,8 @@ def prepare(out_dir: Path = OUT_DIR) -> None:
     }
     df = duckdb.execute(LABELLED, params).fetchdf()
     train, test = train_test_split(df, test_size=0.2, stratify=df.label, random_state=SEED)
+    train, test = train.copy(), test.copy()
+    print(f"relabel: {relabel_git(train) + relabel_git(test)} git rows follow the git rule")
 
     out_dir.mkdir(parents=True, exist_ok=True)
     for name, part in (("train", train), ("test", test)):
