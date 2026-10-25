@@ -12,10 +12,10 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline, make_pipeline, make_union
 
-from shellguard.data import ROOT
 from shellguard.tokens import shell_features
 
-MODEL_PATH = ROOT / "models" / "model_a.joblib"
+# Inside the package (not the repo's models/) so `uv tool install .` ships it. Git-ignored.
+MODEL_PATH = Path(__file__).parent / "model_a.joblib"
 # P(dangerous) at or above this -> "dangerous". Picked in step 8 on out-of-fold train
 # predictions: below 0.5 because a miss (irreversible loss) costs more than a false alarm.
 THRESHOLD = 0.35

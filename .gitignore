@@ -5,3 +5,4 @@ data/raw/
 data/train.parquet
 data/test.parquet
 models/
+src/shellguard/model_a.joblib
