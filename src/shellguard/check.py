@@ -1,12 +1,14 @@
 """check(cmd): verdict plus which parts of a chain made it dangerous.
 
   check("cd /tmp && rm -rf build && ls")
-    -> {"label": "dangerous", "danger_probability": 0.62,
+    -> {"label": "dangerous", "danger_probability": 0.82,
         "flagged": [{"part": "rm -rf build", "danger_probability": 0.82}]}
 
-The whole command decides the label (that is what was measured). Splitting only names
-parts to show and remember: every part >= threshold, highest first; the whole chain if
-none is dangerous alone. Harmless parts (chain.harmless: plain echo, cd, ls, ...) are
+Dangerous if the whole command OR any non-harmless part of the chain is >= threshold:
+scoring only the whole let a long script dilute a dangerous line (25-line heredoc +
+rm -rf: whole 0.208, rm part 0.836). danger_probability is the highest of those scores.
+flagged = every part >= threshold, highest first; the whole chain if none is dangerous
+alone (the danger is the combination). Harmless parts (chain.harmless: plain echo, cd, ls, ...) are
 never flagged, and a command made only of them is safe without asking the model.
 Shared by the CLI and the daemon.
 """
@@ -28,15 +30,12 @@ def check(command: str, score: Scorer = _model_scorer) -> dict:
     parts = list(dict.fromkeys(split_chain(command)))  # unique, order kept
     if parts and all(harmless(s) for s in parts):  # e.g. `echo hi`, `cd /tmp && pwd`
         return {"label": "safe", "danger_probability": 0.0, "flagged": []}
-    p = score([command])[0]
-    flagged = []
-    if p >= THRESHOLD:
-        if parts != [command]:  # it was a chain
-            risky = [s for s in parts if not harmless(s)]
-            hits = [(q, s) for q, s in zip(score(risky), risky) if q >= THRESHOLD]
-            flagged = [{"part": s, "danger_probability": round(q, 3)}
-                       for q, s in sorted(hits, key=lambda h: -h[0])]
-        if not flagged:  # single command, or danger is the combination
-            flagged = [{"part": command, "danger_probability": round(p, 3)}]
-    return {"label": "dangerous" if p >= THRESHOLD else "safe",
-            "danger_probability": round(p, 3), "flagged": flagged}
+    risky = [s for s in parts if not harmless(s)] if parts != [command] else []
+    p, *qs = score([command, *risky])  # one batch
+    hits = sorted(((q, s) for q, s in zip(qs, risky) if q >= THRESHOLD), key=lambda h: -h[0])
+    flagged = [{"part": s, "danger_probability": round(q, 3)} for q, s in hits]
+    if p >= THRESHOLD and not flagged:  # single command, or danger is the combination
+        flagged = [{"part": command, "danger_probability": round(p, 3)}]
+    worst = max([p, *qs])
+    return {"label": "dangerous" if flagged else "safe",
+            "danger_probability": round(worst, 3), "flagged": flagged}

@@ -1,7 +1,9 @@
 """check(cmd): the verdict the CLI and the daemon both return.
 
-The whole command decides the label (that is what was measured). Only when it is
-dangerous is the chain split, to name which parts to show and remember:
+A command is dangerous if the whole command OR any non-harmless part of the chain
+scores >= threshold. Scoring only the whole let a long script dilute a dangerous line
+(25-line heredoc + rm -rf: whole 0.208, rm part 0.836).
+  danger_probability = max(whole, every non-harmless part)
   flagged = every part scoring >= threshold, highest first, no duplicates;
             the whole chain if no part is dangerous on its own (danger is the combination).
 """
@@ -44,12 +46,19 @@ def test_echo_that_writes_a_file_is_still_flagged():
     assert [f["part"] for f in out["flagged"]] == ["echo x >> ~/.bashrc"]
 
 
-def test_safe_chain_is_not_split():
-    # a part alone may score high (short parts are noisy); the whole decides
-    s = fake({"git status && echo done": 0.1, "echo done": 0.7})
-    out = check("git status && echo done", s)
-    assert out["label"] == "safe" and out["flagged"] == []
-    assert s.calls == [["git status && echo done"]]
+def test_safe_chain_with_safe_parts_is_safe():
+    s = fake({"git status && git diff": 0.1, "git status": 0.2, "git diff": 0.05})
+    out = check("git status && git diff", s)
+    assert out == {"label": "safe", "danger_probability": 0.2, "flagged": []}
+
+
+def test_dangerous_part_diluted_by_a_long_script_is_caught():
+    script = "python3 - <<'EOF'\n" + "\n".join(f"print({i})" for i in range(25)) + "\nEOF"
+    cmd = f"{script}\nrm -rf /tmp/sgtest"
+    out = check(cmd, fake({cmd: 0.208, script: 0.1, "rm -rf /tmp/sgtest": 0.836}))
+    assert out["label"] == "dangerous"
+    assert out["danger_probability"] == 0.836
+    assert out["flagged"] == [{"part": "rm -rf /tmp/sgtest", "danger_probability": 0.836}]
 
 
 def test_single_dangerous_command_flags_itself():
@@ -61,7 +70,7 @@ def test_single_dangerous_command_flags_itself():
 def test_chain_names_the_dangerous_part():
     cmd = "cd /tmp && rm -rf build && ls"
     out = check(cmd, fake({cmd: 0.62, "cd /tmp": 0.1, "rm -rf build": 0.82, "ls": 0.01}))
-    assert out["danger_probability"] == 0.62
+    assert out["danger_probability"] == 0.82  # the command is as dangerous as its worst part
     assert out["flagged"] == [{"part": "rm -rf build", "danger_probability": 0.82}]
 
 
@@ -93,13 +102,13 @@ def test_parts_scored_in_one_batch():
     cmd = "cd /tmp && rm -rf build && ls"
     s = fake({cmd: 0.62, "rm -rf build": 0.82})
     check(cmd, s)
-    assert s.calls == [[cmd], ["rm -rf build"]]  # cd and ls are harmless: not scored
+    assert s.calls == [[cmd, "rm -rf build"]]  # whole + parts together; cd, ls harmless
 
 
 def test_probabilities_rounded_to_3_decimals():
     cmd = "cd /tmp && rm -rf build"
-    out = check(cmd, fake({cmd: 0.623456, "rm -rf build": 0.821987}))
-    assert out["danger_probability"] == 0.623
+    out = check(cmd, fake({cmd: 0.923456, "rm -rf build": 0.821987}))
+    assert out["danger_probability"] == 0.923
     assert out["flagged"][0]["danger_probability"] == 0.822
 
 
@@ -149,3 +158,10 @@ def test_printing_a_literal_key_placeholder(cmd):
 
 def test_exit_status_echo_stays_quiet():
     assert check('rm -rf /tmp/tester; echo "exit $?"')["flagged"][0]["part"] == "rm -rf /tmp/tester"
+
+
+def test_real_model_catches_rm_after_a_long_heredoc():
+    script = "mkdir -p /tmp/sgtest && python3 - <<'EOF'\n" + "\n".join(f"print({i})" for i in range(1, 26)) + "\nEOF"
+    out = check(script + "\nrm -rf /tmp/sgtest && echo gone")
+    assert out["label"] == "dangerous"
+    assert [f["part"] for f in out["flagged"]] == ["rm -rf /tmp/sgtest"]

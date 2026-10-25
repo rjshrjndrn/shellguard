@@ -84,7 +84,7 @@ def wait_for(cond, timeout=3):
 def test_scores_over_socket(tmp):
     d = Daemon(tmp)
     out = d.ask("cd /tmp && rm -rf build")
-    assert out == {"command": "cd /tmp && rm -rf build", "label": "dangerous", "danger_probability": 0.62,
+    assert out == {"command": "cd /tmp && rm -rf build", "label": "dangerous", "danger_probability": 0.82,
                    "flagged": [{"part": "rm -rf build", "danger_probability": 0.82}]}
     assert d.ask("ls")["label"] == "safe"
 

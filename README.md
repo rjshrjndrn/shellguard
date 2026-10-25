@@ -766,18 +766,23 @@ Code: `src/shellguard/__main__.py`, verdict from `src/shellguard/check.py`. Cont
   0.222 means "22% dangerous", and anything ≥ 0.35 is labelled dangerous.
   It is a model score, not calibrated: on the test split, commands scored
   0.15–0.25 were really dangerous ~4% of the time.
-- `flagged` = which parts made it dangerous; `[]` when safe. The **whole command
-  decides the label**; only then is it split (tree-sitter-bash, `src/shellguard/chain.py`)
-  on `&&` `||` `;` newline — never on `|`, quotes, `$( )`, loops or heredocs. Every part
-  ≥ 0.35 is listed, highest first; if no part is dangerous alone, the danger is the
-  combination and the whole command is the one flagged part.
+- `flagged` = which parts made it dangerous; `[]` when safe. A command is split
+  (tree-sitter-bash, `src/shellguard/chain.py`) on `&&` `||` `;` newline — never on `|`,
+  quotes, `$( )`, loops or heredocs — and is **dangerous if the whole command or any
+  part scores ≥ 0.35**. Scoring only the whole let a long script dilute a dangerous
+  line (25-line heredoc then `rm -rf /tmp/x`: whole 0.208, the `rm` part 0.836).
+  `danger_probability` is the highest of those scores. Every part ≥ 0.35 is listed,
+  highest first; if none is dangerous alone, the danger is the combination and the
+  whole command is the one flagged part.
 - **Harmless parts are never flagged.** Model A scores short commands noisily
   (`echo hi` 0.81 is above `rm -rf /tmp/x` 0.71), so a plain `echo`, `printf`, `true`,
   `false`, `:`, `pwd`, `cd`, `ls`, `test`/`[`, `sleep`, `which` or `type` is skipped, and a
   command made only of them is `safe` with `danger_probability` 0.0 (the model is not
   asked). Only plain ones: any redirect (`echo x >> ~/.bashrc`), `$( )`, `<( )`, env
-  assignment (`LD_PRELOAD=… ls`) or pipe makes the part scored as usual
-  (`src/shellguard/chain.py: harmless`).
+  assignment (`LD_PRELOAD=… ls`), pipe, or a variable whose name looks like a secret
+  (`echo $GITHUB_TOKEN`: TOKEN, SECRET, PASS, KEY, CRED, AUTH, …; dangerous 34× vs safe
+  1× in the data) makes the part scored as usual (`src/shellguard/chain.py: harmless`).
+  Known miss: printing a literal key (`printf %s "<API_KEY>"`) looks like any echo.
 - exit code = **0 safe, 1 dangerous, 2 usage error** (grep's convention), so a hook
   can do `shellguard "$cmd" >/dev/null || ask_user`
 
@@ -807,12 +812,21 @@ What exists now:
 3. **A CLI** — `shellguard "<cmd>"` → one JSON line, exit 0/1/2; `shellguard --serve` → the daemon.
 4. **A pi hook** — `make hook-pi`; see [pi hook](#pi-hook).
 
-Current scores (`results/model_a.json`, threshold 0.35):
+Current scores of model A alone (`results/model_a.json`, threshold 0.35):
 
 | set | n | recall | precision | missed | false alarms |
 |---|---|---|---|---|---|
 | test split | 8,402 | 0.988 | 0.941 | 56 | 281 |
 | golden | 48 | 1.000 | 0.806 | 0 | 6 |
+| hard | 55 | 1.000 | 0.840 | 0 | 8 |
+
+The CLI and the pi hook use `check()` (model A + chain parts + harmless rules), measured
+on the same sets:
+
+| set | n | recall | precision | missed | false alarms |
+|---|---|---|---|---|---|
+| test split | 8,402 | 0.991 | 0.935 | 40 | 310 |
+| golden | 48 | 1.000 | 0.833 | 0 | 5 |
 | hard | 55 | 1.000 | 0.840 | 0 | 8 |
 
 Tried and parked: **tree-sitter-bash** instead of `shlex` — a tie (8e′), on branch
