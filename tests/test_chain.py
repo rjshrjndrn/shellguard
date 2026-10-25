@@ -38,6 +38,13 @@ CASES = [
     ("case $x in a) ls;; b) rm -rf ~;; esac", ["case $x in a) ls;; b) rm -rf ~;; esac"]),
     # heredoc body is data, not commands
     ("cat <<EOF > f.sh\nrm -rf ~ && echo hi\nEOF\nbash f.sh", ["cat <<EOF > f.sh\nrm -rf ~ && echo hi\nEOF", "bash f.sh"]),
+    # tree-sitter hangs a trailing redirect on the whole && list; in bash it belongs
+    # to the last command only, so the chain must still split
+    ("mkdir -p /tmp/t && ls -ld /tmp/t && rm -r /tmp/t && ls -ld /tmp/t 2>&1",
+     ["mkdir -p /tmp/t", "ls -ld /tmp/t", "rm -r /tmp/t", "ls -ld /tmp/t 2>&1"]),
+    ("a || b > out.txt", ["a", "b > out.txt"]),
+    ("cd x && cat >> f <<'EOF'\nhi && bye\nEOF", ["cd x", "cat >> f <<'EOF'\nhi && bye\nEOF"]),
+    ("a && b 2>&1; c && d > f", ["a", "b 2>&1", "c", "d > f"]),
     # trailing separators and blank input
     ("ls; pwd;", ["ls", "pwd"]),
     ("   ", []),

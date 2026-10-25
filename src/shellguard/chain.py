@@ -25,12 +25,21 @@ def split_chain(command: str) -> list[str]:
 
     parts: list[str] = []
 
-    def walk(node) -> None:
-        for child in node.named_children:
+    def walk(node, end: int | None = None) -> None:
+        """`end`: stretch the last part to here (it owns a redirect, see below)."""
+        kids = [c for c in node.named_children if c.type != "comment"]
+        for i, child in enumerate(kids):
+            last_end = end if end is not None and i == len(kids) - 1 else None
+            body = child.child_by_field_name("body") if child.type == "redirected_statement" else None
             if child.type == "list":
-                walk(child)
-            elif child.type != "comment":
-                parts.append(source[child.start_byte : child.end_byte].decode().strip())
+                walk(child, last_end)
+            elif body is not None and body.type == "list":
+                # tree-sitter hangs `a && b 2>&1` / `cd x && cat > f <<EOF` on the whole
+                # list; in bash the redirect belongs to the last command only
+                walk(body, child.end_byte)
+            else:
+                stop = last_end if last_end is not None else child.end_byte
+                parts.append(source[child.start_byte : stop].decode().strip())
 
     walk(root)
     return [p for p in parts if p]

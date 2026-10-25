@@ -165,3 +165,10 @@ def test_real_model_catches_rm_after_a_long_heredoc():
     out = check(script + "\nrm -rf /tmp/sgtest && echo gone")
     assert out["label"] == "dangerous"
     assert [f["part"] for f in out["flagged"]] == ["rm -rf /tmp/sgtest"]
+
+
+def test_real_session_rm_before_trailing_redirect_is_flagged():
+    # pi session 2026-10-25: ran without a popup, the 2>&1 hid the chain (0.069)
+    out = check("mkdir -p /tmp/tester && ls -ld /tmp/tester && rm -r /tmp/tester && ls -ld /tmp/tester 2>&1")
+    assert out["label"] == "dangerous"
+    assert [f["part"] for f in out["flagged"]] == ["rm -r /tmp/tester"]
