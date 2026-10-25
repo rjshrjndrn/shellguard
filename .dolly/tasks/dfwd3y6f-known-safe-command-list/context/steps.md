@@ -63,3 +63,35 @@ Known gaps (not covered by rule): r=rm; $r -rf ~ ; bash -c "rm ..." (string arg,
 python -c shutil.rmtree; > file truncation via redirect; mv over a file; git push --force;
 git checkout -- . / git restore . ; chmod/chown. Model still scores those.
 <!-- /dolly:step 0002 -->
+
+<!-- dolly:step 0003 -->
+## 0003 · 2026-10-25T17:49:37Z · @rjshrjndrn
+
+- task status: validating
+- files: `src/shellguard/chain.py`, `tests/test_chain.py`, `tests/test_check.py`, `README.md`
+
+git commit / git add -A were flagged by model A (0.56 / 0.82): all 30 `git commit` train rows are
+labelled dangerous because they sit in chains with push --force / --amend / --no-verify; the model
+learned the git words. Data audit of 657 dangerous git rows: ~350 dangerous because of git itself
+(push --force 164, push --delete 84, reset --hard 54, checkout -- . 16, clean 9, ...), 305 because
+of another part of the chain. Contradictions: `git add . && git commit -m bump` dangerous vs
+`git add go.mod && git commit -m bump` safe; `git checkout -b x` dangerous vs `git checkout x` safe;
+`git add secrets.yaml` / `sudo git add .pypirc` labelled safe.
+User decisions: plain `git push` asks; `git commit --amend` asks.
+Rule (chain.py):
+- _git_safe (OPTION_RULES["git"]): no global options; status/log/diff/show (no --output),
+  fetch/pull (no --upload-pack/-f), add (no -f, no secret path), commit (no --amend/--no-verify/-n),
+  branch (list/create only), checkout/switch -b|-c NAME [START], switch NAME, stash
+  push/save/pop/apply/list/show. `checkout NAME` NOT safe (NAME may be a file -> discards).
+- _commit_message_heredoc: `git commit [..] -F - <<EOF` with only the heredoc redirect and no
+  $( ) in the body. tree-sitter drops the lone `-` before `<<`; read from source bytes.
+- _git_destroys: push (any), commit --amend/--no-verify/-n (via _commit_flags, ignores -m value),
+  checkout -f/--/., restore (unless only --staged), switch --discard-changes/-f, branch/tag -d/-D,
+  stash drop/clear, reflog expire/delete, filter-repo/filter-branch, add <secret path>.
+- _SECRET_PATH gained `secrets/` / `credentials/` folders (needs the slash: grep -rn secret src
+  stays safe).
+Measured: ShellRisk benign 1315 -> 1309/4001; risky 136/193 unchanged; golden 25/25, hard 48/48;
+our test dangerous caught 4492 -> 4483/4535 (9 = git add -A / git add . && git commit labelled
+dangerous by dataset; safe by user's rule). Benign newly flagged: 1 (`git checkout -- files`).
+Next (approved plan): subtask 2 relabel git rows in train data per this table, subtask 3 retrain.
+<!-- /dolly:step 0003 -->
