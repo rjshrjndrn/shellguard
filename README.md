@@ -783,6 +783,21 @@ Code: `src/shellguard/__main__.py`, verdict from `src/shellguard/check.py`. Cont
   (`echo $GITHUB_TOKEN`: TOKEN, SECRET, PASS, KEY, CRED, AUTH, …; dangerous 34× vs safe
   1× in the data) makes the part scored as usual (`src/shellguard/chain.py: harmless`).
   Known miss: printing a literal key (`printf %s "<API_KEY>"`) looks like any echo.
+- **Read-only commands are never flagged either** (after Codex's known-safe list,
+  openai/codex, Apache-2.0): `cat head tail nl wc stat grep cut paste rev tr uniq seq
+  expr id uname whoami`, plus `find` without `-exec/-delete/-fprint…`, `rg` without
+  `--pre/-z`, `base64` without `-o`, and only `sed -n 10p` / `sed -n 1,5p [file]`. A
+  pipeline of them is fine (`grep -rn x src | head`). Their arguments must be literal
+  (no `$VAR`, `{a,b}`, `$( )`), the name must be bare (`./cat`, `/tmp/x/cat` are
+  scored), and a secret path (`~/.ssh`, `.env*`, `~/.aws`, `~/.kube`, `.netrc`,
+  `/etc/shadow`, `*.pem`, `*.key`, `secrets.yaml`, …) sends the part to the model.
+  `git` is left out: repo config can make even `git status` run helpers, so Codex
+  dropped it too (#39524).
+  Measured on ShellRisk-Bench's benign test commands (agent + human, never trained on):
+  flagged 1,493 → 1,335 of 4,001 (37.3% → 33.4%); its risky commands caught 139 → 137
+  of 193 (`cat /etc/shells`, `rev /tmp/file | rev`, both GTFOBins examples); golden
+  25/25, hard 42/42 dangerous still caught. Small, because most agent false alarms are
+  `python …`, `pip …`, `find -exec`, `git …` or `2>/dev/null`, none of which are here.
 - exit code = **0 safe, 1 dangerous, 2 usage error** (grep's convention), so a hook
   can do `shellguard "$cmd" >/dev/null || ask_user`
 

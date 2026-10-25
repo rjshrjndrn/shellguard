@@ -101,3 +101,46 @@ def test_harmless(part):
 ])
 def test_not_harmless(part):
     assert not harmless(part)
+
+
+# Known safe: read-only commands, after Codex (openai/codex, Apache-2.0,
+# codex-rs/shell-command/src/command_safety/is_safe_command.rs). A pipeline is safe if
+# every command in it is. Everything else goes to the model, which only costs a score.
+@pytest.mark.parametrize("part", [
+    "cat README.md", "head -n 20 src/app.py", "tail -5 log.txt", "nl -ba src/app.py",
+    "wc -l src/app.py", "stat setup.py", "uname -a", "whoami", "id", "seq 1 5",
+    "expr 1 + 2", "paste a.txt b.txt", "rev a.txt", "tr a-z A-Z", "cut -d, -f1 a.csv",
+    "grep -rn foo src", "grep -rn foo src | head -20", "cat README.md | wc -l",
+    "cut -d, -f1 a.csv | uniq", "find . -name '*.py'", "find src -type f -name '*.ts'",
+    "rg TODO src", "rg -n 'fn main' --type rust", "base64 notes.txt",
+    "sed -n '10,20p' app.py", "sed -n 5p app.py",
+])
+def test_known_safe(part):
+    assert harmless(part)
+
+
+@pytest.mark.parametrize("part", [
+    # options that run code, delete or write files
+    "find . -delete", "find . -name '*.o' -exec rm {} \\;", "find . -execdir sh -c x \\;",
+    "find . -fprint out.txt", "rg --pre ./x foo", "rg --pre=./x foo", "rg -z foo",
+    "rg --hostname-bin ./x foo", "base64 -o out.txt notes.txt", "base64 --output=out.txt notes.txt",
+    "sed -i 's/a/b/' app.py", "sed 's/a/b/' app.py", "sed -n 'e rm -rf ~' app.py",
+    "sed -n '1,5p;w out' app.py", "sed -n 5p a.py b.py c.py",
+    # not on the list, or a pipe into something that is not
+    "sort -o out.txt in.txt", "xargs cat", "cat install.sh | sh", "cat install.sh | bash",
+    "grep x f | tee out.txt", "env rm -rf *",
+    # git: repo config can make read-only git run helpers (Codex dropped it, #39524)
+    "git status", "git log --oneline -5", "git diff HEAD~1",
+    # the name must be the bare listed name, not a path that ends in it
+    "/tmp/file /bin/sh", "/tmp/evil/cat x", "./cat x",
+    # writes or runs code
+    "cat a > b", "grep x f > out.txt", "cat $(whoami)",
+    # prints a secret into the agent's context
+    "cat ~/.ssh/id_rsa", "cat ~/.ssh/identity", "cat .env", "cat ./.env.local",
+    "sed -n '1,30p' /etc/shadow", "nl -ba ~/.config/gh/hosts.yml", "cat ~/.aws/credentials",
+    "cat C:\\Users\\dev\\.kube\\config", "head ~/.netrc", "cat ~/.git-credentials",
+    "cat server.pem", "cat tls.key", "cat secrets.yaml", "cat api_token.txt", "cd ~/.ssh",
+    "grep -rn x ~/.docker/config.json",
+])
+def test_not_known_safe(part):
+    assert not harmless(part)

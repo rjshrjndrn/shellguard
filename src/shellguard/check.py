@@ -8,7 +8,8 @@ Dangerous if the whole command OR any non-harmless part of the chain is >= thres
 scoring only the whole let a long script dilute a dangerous line (25-line heredoc +
 rm -rf: whole 0.208, rm part 0.836). danger_probability is the highest of those scores.
 flagged = every part >= threshold, highest first; the whole chain if none is dangerous
-alone (the danger is the combination). Harmless parts (chain.harmless: plain echo, cd, ls, ...) are
+alone (the danger is the combination). Harmless parts (chain.harmless: plain echo, cd, ls,
+read-only cat, grep, head, find, rg, ... and pipes of them) are
 never flagged, and a command made only of them is safe without asking the model.
 Shared by the CLI and the daemon.
 """

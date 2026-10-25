@@ -172,3 +172,10 @@ def test_real_session_rm_before_trailing_redirect_is_flagged():
     out = check("mkdir -p /tmp/tester && ls -ld /tmp/tester && rm -r /tmp/tester && ls -ld /tmp/tester 2>&1")
     assert out["label"] == "dangerous"
     assert [f["part"] for f in out["flagged"]] == ["rm -r /tmp/tester"]
+
+
+def test_read_only_chain_is_safe_without_scoring():
+    s = fake({})
+    cmd = "grep -rn foo src | head -20 && sed -n '1,5p' a.py; cat README.md | wc -l"
+    assert check(cmd, s) == {"label": "safe", "danger_probability": 0.0, "flagged": []}
+    assert s.calls == []
