@@ -7,9 +7,9 @@ SG_SOCK ?= $(HOME)/.cache/shellguard/sock
 help: ## list targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
 
-test: ## run all tests (python + pi hook)
+test: ## run all tests (python + pi and claude hooks)
 	uv run pytest -q
-	node --test hooks/pi/*.test.ts
+	node --test hooks/pi/*.test.ts hooks/claude/*.test.ts
 
 data: ## download pinned dataset to data/raw/
 	uv run python -m shellguard.data
