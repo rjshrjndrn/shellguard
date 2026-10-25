@@ -6,16 +6,16 @@ status: working
 owner: rjshrjndrn
 collaborators: [rjshrjndrn]
 tags: []
-steps: 12
+steps: 13
 spec_version: 2
 created: 2026-10-24T12:58:38Z
-updated: 2026-10-25T07:44:26Z
+updated: 2026-10-25T08:29:51Z
 ---
 
 # df2cfsfz · shellguard: dangerous shell command classifier
 
 <!-- dolly:header -->
-`working` · spec v2 · @rjshrjndrn · 12 steps · updated 2026-10-25 07:44Z
+`working` · spec v2 · @rjshrjndrn · 13 steps · updated 2026-10-25 08:29Z
 <!-- /dolly:header -->
 
 ## Spec
@@ -77,4 +77,6 @@ Plan complete. Status → todo.
   files: `src/shellguard/tokens.py`, `tests/test_tokens.py`, `README.md` · full: `steps.md#0011`
 - `2026-10-25 07:44Z` @rjshrjndrn: Installed CLI crashed (model looked up in repo models/); model A now lives in src/shellguard/ and ships in the wheel, proven by an install test. README refreshed to current state + quick start.
   files: `src/shellguard/model_a.py`, `tests/test_install.py`, `.gitignore`, `README.md` · full: `steps.md#0012`
+- `2026-10-25 08:29Z` @rjshrjndrn: Output key renamed probability -> danger_probability (bare 'probability' read as confidence in the label); CLI rounds to 3 decimals.
+  files: `src/shellguard/__main__.py`, `src/shellguard/model_a.py`, `tests/test_cli.py`, `README.md`
 
