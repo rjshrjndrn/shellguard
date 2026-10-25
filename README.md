@@ -12,7 +12,25 @@ $ echo $?
 Model A, threshold 0.35 — see [Final output](#final-output).
 
 This repo is also a learning project: build a small focused model from zero,
-every step written down. Status markers: ✅ done · ⏳ planned.
+every step written down. All steps are ✅ done; numbers inside each step are
+from *that* point in time (later steps changed data and model), the
+**Final output** section has the current state.
+
+## Quick start
+
+Needs [uv](https://docs.astral.sh/uv/). Everything below is reproducible from zero:
+
+```bash
+uv sync                      # install deps (Python 3.12)
+make data                    # download both pinned datasets → data/raw/  (sha256-checked)
+make prepare                 # merge + label + split → data/{train,test}.parquet
+make train MODEL=model_a     # ~5 s → src/shellguard/model_a.joblib
+make eval  MODEL=model_a     # test split + golden + hard → results/model_a.json
+make test                    # pytest, incl. building + installing the wheel
+
+uv run shellguard "rm -rf ~" # use it inside the repo
+uv tool install .            # or globally (after make train): shellguard "…" from anywhere
+```
 
 ---
 
@@ -37,7 +55,8 @@ false alarms over misses: we optimise **recall** on the dangerous class.
  ┌──────────────────────────── TRAIN (once, on a Mac M1) ───────────────────────────┐
  │                                                                                   │
  │  Hugging Face                                                                     │
- │  yannelli/cli-command-risk ──download──▶ data/raw/<dataset>/  (2 datasets)        │
+ │  yannelli/cli-command-risk ─┐                                                     │
+ │  tomngdev/shell-safety ─────┴─download─▶ data/raw/<dataset>/                      │
  │                                              │                                    │
  │                                   dedupe + label rule + split                     │
  │                                              ▼                                    │
@@ -45,11 +64,11 @@ false alarms over misses: we optimise **recall** on the dangerous class.
  │                                 │                         │                       │
  │                       fit model A / B / C          measure recall/precision       │
  │                                 ▼                         ▲                       │
- │                          models/<file> ───────────────────┘                       │
+ │                          model file ──────────────────────┘                       │
  │                                                                                   │
- │  data/golden.csv (48 hand-written commands) ── never trained on ── final exam     │
+ │  data/golden.csv (48) + data/hard.csv (55) ── never trained on ── final exams     │
  └───────────────────────────────────────────────────────────────────────────────────┘
-                                   │  copy one model file
+                                   │  model A ships inside the package
                                    ▼
  ┌────────────────────── RUN (anywhere, CPU only, no GPU) ──────────────────────┐
  │  shellguard "<cmd>"  ──▶  load model file  ──▶  predict  ──▶  JSON + exit code │
@@ -96,8 +115,11 @@ Tests:
 - `tests/test_golden.py` — one test per command, calls
   `shellguard.predict(cmd)` and expects `{"label": ..., "probability": P(dangerous)}`.
 
-Right now: 4 data tests pass, 48 golden tests **fail** (no model yet). That is
+At this step: 4 data tests pass, 48 golden tests **fail** (no model yet). That is
 correct — tests first, then code.
+
+> **Update (step 8g):** with model A shipped, 42 golden tests pass; the 6 golden
+> false alarms are strict xfails (known failures, see 8g).
 
 ### Step 2 — Download the dataset ✅
 
@@ -285,7 +307,7 @@ crash at zero flags, `run()` writes results for both splits.
 ### Step 5 — Model A: no base model (TF-IDF + logistic regression) ✅
 
 ```bash
-make train MODEL=model_a   # 2.4 s on M1 CPU → models/model_a.joblib (1.1 MB)
+make train MODEL=model_a   # 2.4 s on M1 CPU → models/model_a.joblib (1.1 MB)  [now: see Final output]
 make eval  MODEL=model_a   # → results/model_a.json
 ```
 
@@ -318,6 +340,11 @@ per slice that best separates dangerous from safe on the 22,624 train commands.
 **Saving** = `joblib.dump` → `models/model_a.joblib`. joblib uses pickle, which
 can run code on load — fine for a file we built ourselves, never for a
 downloaded one. (Step 8 decides the shipped format: JSON weights or ONNX.)
+
+> **Update (steps 8e–8g, 9):** model A became char n-grams **+** shell tokens
+> (a `FeatureUnion`), the threshold became **0.35** instead of 0.5, the format
+> stayed joblib, and the file moved to `src/shellguard/model_a.joblib` so it
+> ships inside the installed package.
 
 **Result:**
 
@@ -710,7 +737,7 @@ the list, so progress can't go unnoticed. `make test`: all green.
 
 ```bash
 uv run shellguard "git clean -fdx"         # in the repo
-uv tool install .                          # or install globally, then just: shellguard "…"
+uv tool install .                          # or install globally (needs make train first), then: shellguard "…"
 ```
 
 ```
@@ -741,17 +768,29 @@ usage on stderr; stdout is exactly one JSON line; no duckdb/torch at startup.
 
 What exists now:
 
-1. **A model file** — `models/model_a.joblib` (4.5 MB, git-ignored, rebuilt by
-   `make train MODEL=model_a` in ~5 s). Inside: two vocabularies (char pieces +
+1. **A model file** — `src/shellguard/model_a.joblib` (4.5 MB, git-ignored, rebuilt by
+   `make train MODEL=model_a` in ~5 s; lives in the package so `uv tool install .`
+   carries it — `tests/test_install.py` proves it).  Threshold 0.35. Inside: two vocabularies (char pieces +
    shell tokens, 149,125 features), their IDF numbers, one weight per feature, one
    intercept. Plus the formula in `src/shellguard/model_a.py` and the tokenizer in
    `src/shellguard/tokens.py`. joblib = pickle: only load files you built.
 2. **A Python function** — `from shellguard import predict` → `{"label", "probability"}`.
 3. **A CLI** — `shellguard "<cmd>"` → one JSON line, exit 0/1/2.
 
+Current scores (`results/model_a.json`, threshold 0.35):
+
+| set | n | recall | precision | missed | false alarms |
+|---|---|---|---|---|---|
+| test split | 8,402 | 0.988 | 0.941 | 56 | 281 |
+| golden | 48 | 1.000 | 0.806 | 0 | 6 |
+| hard | 55 | 1.000 | 0.840 | 0 | 8 |
+
+Tried and parked: **tree-sitter-bash** instead of `shlex` — a tie (8e′), on branch
+`tree-sitter-tokens`. Models B and C stay in the repo for comparison, not shipped.
+
 Not a standalone binary. Not yet:
 - **portable format** — weights as JSON so Node/Go can run it without Python;
-- **tree-sitter-bash** features (real grammar instead of `shlex`);
+- **fast startup** — ~1.1 s per call (scikit-learn import + model load);
 - **training data** for the known gaps (stray space, `branch -D` vs `-d`, `curl`/`/etc` false alarms, fork bomb).
 
 ---
@@ -759,12 +798,13 @@ Not a standalone binary. Not yet:
 ## Layout
 
 ```
-data/golden.csv          hand-labelled exam (committed)
-data/raw/                downloaded parquet (git-ignored)
+data/golden.csv          hand-labelled exam, 48 (committed)
+data/hard.csv            hand-labelled indirect-danger exam, 55 (committed)
+data/raw/<dataset>/      downloaded parquet + jsonl (git-ignored)
 data/{train,test}.parquet  our split (git-ignored, rebuilt by make)
-src/shellguard/          code
-tests/                   pytest
-models/                  trained files (git-ignored)
+src/shellguard/          code; model_a.joblib lands here (git-ignored, shipped in the wheel)
+tests/                   pytest (golden.py = shared exam loader)
+models/                  models B and C, fastembed cache (git-ignored)
 results/                 scores per model (committed)
 .dolly/                  task log (plan, decisions, steps)
 ```
