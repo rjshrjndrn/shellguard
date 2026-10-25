@@ -260,6 +260,28 @@ templates, never seen) is the honest check.
 > excluded          48 golden + 55 hard commands (31 of them were in the datasets)
 > result            42,009 commands, 53.9% dangerous → train 33,607 / test 8,402
 > ```
+
+> **Update (git relabel):** after the split, git rows take the label of the git rule
+> in `chain.py` (`src/shellguard/relabel.py`), because the raw sources contradict
+> each other: `git add . && git commit -m bump` dangerous but `git add go.mod && git
+> commit -m bump` safe; `git clean -fd`, `git branch -D`, `git add id_rsa` and plain
+> `git push` safe. A row changes only if the rule can judge all of it (every part safe
+> by rule → safe; a git part destructive → dangerous); the other ~1,000 git rows keep
+> their label. Changed rows get `relabel:git` in `categories`. Done after the split so
+> no row moves between train and test.
+> ```
+> train  39 dangerous → safe   (git add -A, git add . && git commit, git stash list, checkout -b)
+>        96 safe → dangerous   (48 git add <secret>, 35 git push, 6 revert && push, 4 clean -fd,
+>                               2 branch -D, 1 stash drop)
+> test    8 dangerous → safe,  27 safe → dangerous
+> ```
+> Model A retrained on it, P(dangerous) alone, before → after:
+> `git commit -m 'fix typo'` 0.555 → 0.262, `git add -A` 0.818 → 0.406, `git stash`
+> 0.344 → 0.128, `git add id_rsa` 0.279 → 0.848, `git push origin feature` 0.791 →
+> 0.976. Test F1 0.964 → 0.965 (on the relabelled test split), golden and hard
+> unchanged (0.893 / 0.904). ShellRisk-Bench benign flagged by `check()` 1,309 → 1,318
+> of 4,001: 42 up, 33 down, 2 of each git; retraining noise, mostly `source
+> .venv/bin/activate && …`.
 > `ask` mixes risky (`curl … | python3`, `git push -f`) with routine (`docker pull`,
 > `npx playwright install`). Counting it dangerous trades false alarms for fewer
 > misses — the owner's call. 75 commands appear in both datasets with opposite

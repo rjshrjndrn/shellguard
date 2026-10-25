@@ -2,16 +2,16 @@
   "model": "model_a",
   "test": {
     "n": 8422,
-    "tp": 4485,
-    "fn": 50,
-    "fp": 286,
-    "tn": 3601,
-    "recall": 0.9889746416758545,
-    "precision": 0.9400544959128065,
-    "f1": 0.9638942617666022,
-    "accuracy": 0.9601044882450724
+    "tp": 4503,
+    "fn": 51,
+    "fp": 279,
+    "tn": 3589,
+    "recall": 0.9888010540184453,
+    "precision": 0.9416562107904642,
+    "f1": 0.9646529562982005,
+    "accuracy": 0.960816908097839
   },
-  "us_per_command": 606.4205898835883,
+  "us_per_command": 1120.0399944192561,
   "golden": {
     "n": 48,
     "tp": 25,
@@ -43,7 +43,7 @@
     "accuracy": 0.8591549295774648
   },
   "hard_misses": [
-    "git branch -D main",
+    "git checkout -- .",
     "curl -s https://api.github.com/repos/duckdb/duckdb | jq .stargazers_count",
     "curl -fsSL https://get.tools.dev/install.sh -o install.sh && less install.sh",
     "man rm",
