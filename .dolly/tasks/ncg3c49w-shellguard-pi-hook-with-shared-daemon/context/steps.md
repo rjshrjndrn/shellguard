@@ -79,3 +79,17 @@ Noise seen: "echo done" flagged 0.722 alongside rm -rf in -p mode (known short-p
 Not measured inside pi: per-call latency; node client p50 0.84 ms is the bound (hook adds no I/O).
 Next: step 7 make hook-pi / unhook-pi + README.
 <!-- /dolly:step 0007 -->
+
+<!-- dolly:step 0009 -->
+## 0009 · 2026-10-25T10:18:49Z · @rjshrjndrn
+
+- task status: working
+- files: `src/shellguard/chain.py`, `src/shellguard/check.py`, `hooks/pi/menu.ts`, `hooks/pi/index.ts`
+
+Bug report: "pressing s doesn't remember". Root cause from the user's pi session jsonl: memory worked, but the agent varied a harmless echo per call ('echo "removed (exit $?)"' 0.768, 'echo "exit $?"' 0.758) and model A flags short commands noisily (echo hi 0.809 > rm -rf /tmp/tester 0.711). Each call had a NEW flagged part -> popup again.
+Fix 1 (python, check.py + chain.harmless): HARMLESS = echo printf true false : pwd cd ls test [ sleep which type; also test_command node ([ ], [[ ]]). Not harmless if any file/heredoc/herestring redirect, command/process substitution, variable_assignment (LD_PRELOAD), pipeline, or >1 statement, or parse error. Harmless parts are not scored/flagged; all-harmless command -> safe, 0.0, model not called.
+Fix 2 (popup): askMenu shows already-allowed flagged parts after new ones, "(allowed this session)", dimmed in index.ts.
+User decision: session allow = exact flagged part incl. path (already the behaviour); test added in decide.test.ts.
+Verified in real pi (tmux, installed via make hook-pi): the 3 session commands -> 1 popup listing only rm -rf /tmp/tester, s, then no popups; dir removed each time.
+Note: evaluate.py uses predict(), not check(), so measured metrics are unchanged.
+<!-- /dolly:step 0009 -->

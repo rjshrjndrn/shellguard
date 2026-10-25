@@ -6,16 +6,16 @@ status: validating
 owner: rjshrjndrn
 collaborators: [rjshrjndrn]
 tags: []
-steps: 8
+steps: 9
 spec_version: 2
 created: 2026-10-25T09:11:26Z
-updated: 2026-10-25T09:59:09Z
+updated: 2026-10-25T10:18:49Z
 ---
 
 # ncg3c49w · shellguard pi hook with shared daemon
 
 <!-- dolly:header -->
-`validating` · spec v2 · @rjshrjndrn · 8 steps · updated 2026-10-25 09:59Z
+`validating` · spec v2 · @rjshrjndrn · 9 steps · updated 2026-10-25 10:18Z
 <!-- /dolly:header -->
 
 ## Spec
@@ -68,4 +68,8 @@ Plan complete. Status → todo.
 - `2026-10-25 09:59Z` @rjshrjndrn: make hook-pi installs CLI (py3.12) + copies runtime .ts to ~/.pi/agent/extensions/shellguard and drops the daemon socket so a fresh daemon starts; unhook-pi removes both. Installed for real; pi -p blocked rm -rf with no --extension flag.
   files: `Makefile`, `README.md`, `tests/test_make_hook.py`
 - `2026-10-25 09:59Z` @rjshrjndrn: status working → validating. Restart pi (or /reload): try a chain with rm -rf (popup names it), press s, repeat; /shellguard off|on|status; make unhook-pi removes it.
+- `2026-10-25 10:11Z` @rjshrjndrn: status validating → working.
+- `2026-10-25 10:18Z` @rjshrjndrn: 's' looked broken: memory worked, but each call added a new harmless echo that model A flagged (echo hi 0.81 > rm -rf 0.71). Harmless plain commands are no longer flagged; popup also shows already-allowed parts. Real pi replay: 1 popup, then none.
+  files: `src/shellguard/chain.py`, `src/shellguard/check.py`, `hooks/pi/menu.ts`, `hooks/pi/index.ts` · full: `steps.md#0009`
+- `2026-10-25 10:18Z` @rjshrjndrn: status working → validating. Restart pi or /reload. Ask it to rm -rf a scratch dir a few times: one popup, s, then none. Mixed new + allowed parts show the allowed ones greyed.
 
