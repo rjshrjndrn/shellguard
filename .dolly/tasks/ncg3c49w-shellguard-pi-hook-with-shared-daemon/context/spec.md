@@ -1,10 +1,33 @@
 <!-- dolly spec · task ncg3c49w -->
 # Spec — shellguard pi hook with shared daemon
 
-**current: v2** · updated 2026-10-25T09:11:49Z by @rjshrjndrn · superseded versions are kept at the bottom of this file
+**current: v3** · updated 2026-10-25T10:51:57Z by @rjshrjndrn · superseded versions are kept at the bottom of this file
 
 <!-- dolly:spec-current -->
-<!-- v2 · 2026-10-25T09:11:49Z · @rjshrjndrn -->
+<!-- v3 · 2026-10-25T10:51:57Z · @rjshrjndrn -->
+
+# shellguard pi hook with shared daemon (v2)
+
+Before pi runs a bash command, shellguard scores it in ~1 ms via a shared daemon; dangerous ones stop and ask (allow once / allow for session / deny), naming the flagged parts of a chain.
+
+Verdict (check()):
+- chain split with tree-sitter-bash on && || ; newline (never |, quotes, $( ), loops, heredocs)
+- harmless plain parts (echo printf true false : pwd cd ls test [ sleep which type, no redirect/substitution/env assignment/secret-looking variable) are never flagged; all-harmless command -> safe 0.0
+- dangerous if the whole command OR any non-harmless part >= 0.35 (v1: whole only)
+- danger_probability = max(whole, parts); flagged = parts >= 0.35 highest first, else whole
+- session allow = exact flagged part incl. path, whitespace-insensitive
+
+Measured (test split): hook recall 0.991, 40 missed, 310 false alarms (model alone 0.988 / 56 / 281).
+<!-- /dolly:spec-current -->
+
+---
+
+## Superseded versions
+
+<!-- dolly:spec-history -->
+## v2 — 2026-10-25T09:11:49Z · @rjshrjndrn
+
+> superseded by v3: Whole-command-only verdict let long scripts dilute a dangerous line (rm -rf after a 25-line heredoc scored 0.208 and ran unprompted); harmless-part rule added; secret-variable echos scored again.
 
 # shellguard pi hook with shared daemon
 
@@ -92,13 +115,7 @@ Out:
 **Q (2026-10-25 09:11Z):** Install?
 
 **A:** make hook-pi copies the extension into ~/.pi/agent/extensions/shellguard/. pi only for now.
-<!-- /dolly:spec-current -->
 
----
-
-## Superseded versions
-
-<!-- dolly:spec-history -->
 ## v1 — 2026-10-25T09:11:26Z · @rjshrjndrn
 
 > superseded by v2: planning finished — spec derived from plan.md

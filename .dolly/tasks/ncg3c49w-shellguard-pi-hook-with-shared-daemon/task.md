@@ -2,27 +2,25 @@
 id: ncg3c49w
 slug: shellguard-pi-hook-with-shared-daemon
 title: shellguard pi hook with shared daemon
-status: working
+status: validating
 owner: rjshrjndrn
 collaborators: [rjshrjndrn]
 tags: []
-steps: 10
-spec_version: 2
+steps: 11
+spec_version: 3
 created: 2026-10-25T09:11:26Z
-updated: 2026-10-25T10:35:18Z
+updated: 2026-10-25T10:51:58Z
 ---
 
 # ncg3c49w · shellguard pi hook with shared daemon
 
 <!-- dolly:header -->
-`working` · spec v2 · @rjshrjndrn · 10 steps · updated 2026-10-25 10:35Z
+`validating` · spec v3 · @rjshrjndrn · 11 steps · updated 2026-10-25 10:51Z
 <!-- /dolly:header -->
 
 ## Spec
 
-Before pi runs a bash command, shellguard scores it in ~1 ms; dangerous ones stop and ask the user, with the flagged part of a chain named and rememberable for the session.
-
-Full spec: `context/spec.md` · plan: `context/plan.md`
+Before pi runs a bash command, shellguard scores it in ~1 ms; dangerous if the whole command or any non-harmless part of the chain scores >= 0.35; the popup names the flagged parts (one line each), which can be allowed exactly for the session.
 
 ## Success Criteria
 
@@ -75,4 +73,9 @@ Plan complete. Status → todo.
 - `2026-10-25 10:25Z` @rjshrjndrn: status validating → working.
 - `2026-10-25 10:35Z` @rjshrjndrn: Popup now fixed-height: long commands not printed, flagged parts one line + (+N lines). Found 2 open issues: long scripts dilute a dangerous line below threshold (rm -rf after 25-line heredoc ran unprompted), and harmless() hid 8 secret-printing echos.
   files: `hooks/pi/menu.ts`, `hooks/pi/menu.test.ts` · full: `steps.md#0010`
+- `2026-10-25 10:51Z` @rjshrjndrn: spec → v3. Whole-command-only verdict let long scripts dilute a dangerous line (rm -rf after a 25-line heredoc scored 0.208 and ran unprompted); harmless-part rule added; secret-variable echos scored again.
+  previous version kept in `spec.md`
+- `2026-10-25 10:51Z` @rjshrjndrn: Hook verdict now 'whole OR any non-harmless part' (long scripts no longer dilute rm -rf; 40 vs 56 missed, +29 FA); echo of secret-looking variables scored again (6/8 recovered). Installed and verified via CLI + daemon.
+  files: `src/shellguard/check.py`, `src/shellguard/chain.py`, `tests/test_check.py`, `tests/test_chain.py`, `README.md` · full: `steps.md#0011`
+- `2026-10-25 10:51Z` @rjshrjndrn: status working → validating. Restart pi or /reload. A long script ending in rm -rf on a scratch dir should now pop up naming the rm; the popup stays ~8 lines; echo $SOME_TOKEN pops up.
 

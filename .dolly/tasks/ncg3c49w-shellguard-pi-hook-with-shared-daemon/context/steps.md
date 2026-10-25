@@ -109,3 +109,18 @@ Findings, NOT fixed, need user decisions:
    Test split with harmless filter: whole-decides chains recall 0.963 (31 missed, 97 FA); whole-OR-any-non-harmless-part recall 0.985 (13 missed, 128 FA). Full split: 0.986/64 missed/278 FA vs 0.990/46/309.
 2. Regression from step 9 harmless(): 8 dangerous test commands are all-harmless and were caught by the model before: echo $PASSWORD, echo $AWS_SECRET_ACCESS_KEY, printf %s $SECRET, echo -n $DB_PASSWORD, echo $GITHUB_TOKEN (6 with $VAR) + 2 printf "<API_KEY>" literals. Fix idea: expansions other than special vars ($? $# ...) make echo/printf not harmless.
 <!-- /dolly:step 0010 -->
+
+<!-- dolly:step 0011 -->
+## 0011 · 2026-10-25T10:51:57Z · @rjshrjndrn
+
+- task status: working
+- files: `src/shellguard/check.py`, `src/shellguard/chain.py`, `tests/test_check.py`, `tests/test_chain.py`, `README.md`
+
+Two fixes from step 10 findings.
+1. a2d0b69 harmless(): variable_name matching TOKEN|SECRET|PASS|KEY|CRED|AUTH|PRIVATE|SESSION|COOKIE -> not harmless. Data: echo/printf of such names dangerous 34 / safe 1; other names mixed and model noisy (test -f "$FILE" 0.892, [ -d "$DIR" ] 0.765, echo $PATH 0.843), so a blanket "any variable" rule was rejected after measuring. Recovers 6/8 test-split secret echos; 2 literal "<API_KEY>" printf = strict xfail.
+2. 741b4ae check(): dangerous if whole OR any non-harmless part >= 0.35; danger_probability = max; whole + parts in ONE score() batch. daemon/check tests updated (0.62 -> 0.82 = worst part).
+Measured check() vs model alone: test split recall 0.991 vs 0.988, missed 40 vs 56, FA 310 vs 281; golden FA 5 vs 6; hard unchanged (0 missed, 8 FA).
+Verified installed CLI + daemon via node client: the heredoc+rm case -> dangerous 0.836 flagged rm; warm 0.84 ms; echo $GITHUB_TOKEN dangerous.
+In-pi replay not possible: provider usage-policy filter refuses the test prompts.
+Open follow-up (not done): heredoc attached to `cd X && cat >> f <<EOF` swallows the cd into one part.
+<!-- /dolly:step 0011 -->
