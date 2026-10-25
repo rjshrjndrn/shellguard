@@ -6,16 +6,16 @@ status: validating
 owner: rjshrjndrn
 collaborators: [rjshrjndrn]
 tags: []
-steps: 11
+steps: 12
 spec_version: 3
 created: 2026-10-25T09:11:26Z
-updated: 2026-10-25T10:51:58Z
+updated: 2026-10-25T10:58:59Z
 ---
 
 # ncg3c49w · shellguard pi hook with shared daemon
 
 <!-- dolly:header -->
-`validating` · spec v3 · @rjshrjndrn · 11 steps · updated 2026-10-25 10:51Z
+`validating` · spec v3 · @rjshrjndrn · 12 steps · updated 2026-10-25 10:58Z
 <!-- /dolly:header -->
 
 ## Spec
@@ -78,4 +78,6 @@ Plan complete. Status → todo.
 - `2026-10-25 10:51Z` @rjshrjndrn: Hook verdict now 'whole OR any non-harmless part' (long scripts no longer dilute rm -rf; 40 vs 56 missed, +29 FA); echo of secret-looking variables scored again (6/8 recovered). Installed and verified via CLI + daemon.
   files: `src/shellguard/check.py`, `src/shellguard/chain.py`, `tests/test_check.py`, `tests/test_chain.py`, `README.md` · full: `steps.md#0011`
 - `2026-10-25 10:51Z` @rjshrjndrn: status working → validating. Restart pi or /reload. A long script ending in rm -rf on a scratch dir should now pop up naming the rm; the popup stays ~8 lines; echo $SOME_TOKEN pops up.
+- `2026-10-25 10:58Z` @rjshrjndrn: Trailing 2>&1 hid whole chains from the splitter (tree-sitter attaches it to the && list); rm -r /tmp/tester ran unprompted at 0.069. Last part now owns the redirect; real session command flags rm -r at 0.467.
+  files: `src/shellguard/chain.py`, `tests/test_chain.py`, `tests/test_check.py`
 
