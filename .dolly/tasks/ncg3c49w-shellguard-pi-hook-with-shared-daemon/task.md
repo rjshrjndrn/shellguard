@@ -2,20 +2,20 @@
 id: ncg3c49w
 slug: shellguard-pi-hook-with-shared-daemon
 title: shellguard pi hook with shared daemon
-status: todo
+status: working
 owner: rjshrjndrn
 collaborators: [rjshrjndrn]
 tags: []
-steps: 1
+steps: 2
 spec_version: 2
 created: 2026-10-25T09:11:26Z
-updated: 2026-10-25T09:15:17Z
+updated: 2026-10-25T09:24:23Z
 ---
 
 # ncg3c49w · shellguard pi hook with shared daemon
 
 <!-- dolly:header -->
-`todo` · spec v2 · @rjshrjndrn · 1 step · updated 2026-10-25 09:15Z
+`working` · spec v2 · @rjshrjndrn · 2 steps · updated 2026-10-25 09:24Z
 <!-- /dolly:header -->
 
 ## Spec
@@ -52,4 +52,7 @@ Plan complete. Status → todo.
 
 - plan: `context/plan.md`
 - `2026-10-25 09:15Z` @rjshrjndrn: Decided: flagged[] lists every dangerous part with its score, sorted; CLI and daemon share check() and both emit flagged[].
+- `2026-10-25 09:17Z` @rjshrjndrn: status todo → working.
+- `2026-10-25 09:24Z` @rjshrjndrn: split_chain lands on tree-sitter-bash: hand scanner and shlex cut loops/if/heredocs into junk parts; grammar keeps them whole, 8 us/cmd, invalid bash stays whole.
+  files: `src/shellguard/chain.py`, `tests/test_chain.py`, `pyproject.toml` · full: `steps.md#0002`
 
