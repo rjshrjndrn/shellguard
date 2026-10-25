@@ -13,11 +13,10 @@ def main() -> int:
     if not command.strip():
         print(USAGE, file=sys.stderr)
         return 2
-    from shellguard import predict  # after arg check: loading the model takes ~1 s
+    from shellguard.check import check  # after arg check: loading the model takes ~1 s
 
-    out = predict(command)
-    p = round(out["danger_probability"], 3)  # 3 decimals: more digits are noise
-    print(json.dumps({"command": command, "label": out["label"], "danger_probability": p}))
+    out = check(command)
+    print(json.dumps({"command": command, **out}))
     return 1 if out["label"] == "dangerous" else 0
 
 

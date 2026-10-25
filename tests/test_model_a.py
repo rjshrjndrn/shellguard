@@ -75,3 +75,9 @@ def test_trained_model_beats_regex_baseline():
     a = json.loads(open("results/model_a.json").read())
     base = json.loads(open("results/baseline.json").read())
     assert a["test"]["recall"] > base["test"]["recall"]
+
+
+def test_predict_many_matches_predict():
+    from shellguard.model_a import predict, predict_many
+    cmds = ["rm -rf ~", "ls -la", "git push --force"]
+    assert predict_many(cmds) == [predict(c)["danger_probability"] for c in cmds]

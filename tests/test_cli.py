@@ -20,10 +20,16 @@ def test_argument(command, label, code):
     out = json.loads(r.stdout)
     assert out["command"] == command and out["label"] == label
     # "probability" alone reads as confidence in the label; this is P(dangerous)
-    assert set(out) == {"command", "label", "danger_probability"}
+    assert set(out) == {"command", "label", "danger_probability", "flagged"}
+    assert (out["flagged"] == []) == (label == "safe")
     assert 0.0 <= out["danger_probability"] <= 1.0
     assert out["danger_probability"] == round(out["danger_probability"], 3)
     assert r.returncode == code
+
+
+def test_chain_names_flagged_part():
+    out = json.loads(run("cd /tmp && rm -rf build && ls").stdout)
+    assert [f["part"] for f in out["flagged"]] == ["rm -rf build"]
 
 
 def test_several_arguments_are_one_command():

@@ -45,11 +45,17 @@ def load(path: Path = MODEL_PATH) -> Pipeline:
     return joblib.load(path)
 
 
-def predict(command: str, model: Pipeline | None = None) -> dict:
+def predict_many(commands: list[str], model: Pipeline | None = None) -> list[float]:
+    """P(dangerous) for each command, in one batch."""
     global _model
     if model is None:
         model = _model = _model or load()
-    p = float(model.predict_proba([command])[0][list(model.classes_).index("dangerous")])
+    col = list(model.classes_).index("dangerous")
+    return [float(p) for p in model.predict_proba(commands)[:, col]]
+
+
+def predict(command: str, model: Pipeline | None = None) -> dict:
+    p = predict_many([command], model)[0]
     return {"label": "dangerous" if p >= THRESHOLD else "safe", "danger_probability": p}
 
 

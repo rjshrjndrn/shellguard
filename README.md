@@ -5,9 +5,11 @@ with the probability that it is dangerous. Small, local, CPU-only.
 
 ```
 $ shellguard "git clean -fdx"
-{"command": "git clean -fdx", "label": "dangerous", "danger_probability": 0.498}
+{"command": "git clean -fdx", "label": "dangerous", "danger_probability": 0.498, "flagged": [{"part": "git clean -fdx", "danger_probability": 0.498}]}
 $ echo $?
 1
+$ shellguard "cd /tmp && rm -rf build && ls"     # a chain: names the dangerous part
+{"command": "cd /tmp && rm -rf build && ls", "label": "dangerous", "danger_probability": 0.622, "flagged": [{"part": "rm -rf build", "danger_probability": 0.817}]}
 ```
 Model A, threshold 0.35 — see [Final output](#final-output).
 
@@ -750,19 +752,24 @@ uv tool install --python 3.12 .            # or install globally, then: shellgua
 ```
 
 ```
-$ shellguard "git clean -fdx"                → {"command": "git clean -fdx", "label": "dangerous", "danger_probability": 0.498}   exit 1
-$ shellguard ls -la                          → {"command": "ls -la", "label": "safe", "danger_probability": 0.01}                  exit 0
+$ shellguard "git clean -fdx"                → {"command": "git clean -fdx", "label": "dangerous", "danger_probability": 0.498, "flagged": […]}   exit 1
+$ shellguard ls -la                          → {"command": "ls -la", "label": "safe", "danger_probability": 0.01, "flagged": []}   exit 0
 $ printf 'cd /tmp\nrm -rf ~\n' | shellguard → reads stdin, keeps newlines (multi-line scripts)                          exit 1
 $ shellguard </dev/null                      → usage message on stderr                                                   exit 2
 ```
 
-Code: `src/shellguard/__main__.py` (20 lines). Contract:
+Code: `src/shellguard/__main__.py`, verdict from `src/shellguard/check.py`. Contract:
 - input = all arguments joined by spaces, or stdin if none (trailing newline dropped)
-- stdout = exactly one JSON line: `command`, `label`, `danger_probability`
+- stdout = exactly one JSON line: `command`, `label`, `danger_probability`, `flagged`
   (= P(dangerous), 3 decimals). Not a confidence in the label: `safe` with
   0.222 means "22% dangerous", and anything ≥ 0.35 is labelled dangerous.
   It is a model score, not calibrated: on the test split, commands scored
   0.15–0.25 were really dangerous ~4% of the time.
+- `flagged` = which parts made it dangerous; `[]` when safe. The **whole command
+  decides the label**; only then is it split (tree-sitter-bash, `src/shellguard/chain.py`)
+  on `&&` `||` `;` newline — never on `|`, quotes, `$( )`, loops or heredocs. Every part
+  ≥ 0.35 is listed, highest first; if no part is dangerous alone, the danger is the
+  combination and the whole command is the one flagged part.
 - exit code = **0 safe, 1 dangerous, 2 usage error** (grep's convention), so a hook
   can do `shellguard "$cmd" >/dev/null || ask_user`
 
@@ -787,7 +794,8 @@ What exists now:
    shell tokens, 149,125 features), their IDF numbers, one weight per feature, one
    intercept. Plus the formula in `src/shellguard/model_a.py` and the tokenizer in
    `src/shellguard/tokens.py`. joblib = pickle: only load files you built.
-2. **A Python function** — `from shellguard import predict` → `{"label", "danger_probability"}`.
+2. **Python functions** — `from shellguard import predict` → `{"label", "danger_probability"}`;
+   `from shellguard.check import check` → the same plus `flagged` (what the CLI prints).
 3. **A CLI** — `shellguard "<cmd>"` → one JSON line, exit 0/1/2.
 
 Current scores (`results/model_a.json`, threshold 0.35):
