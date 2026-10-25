@@ -50,7 +50,7 @@ def test_onnx_matches_pytorch(toy_export):
         with torch.no_grad():
             logits = model(**tok(cmd, return_tensors="pt")).logits
         p_torch = torch.softmax(logits, -1)[0, 1].item()
-        assert predict(cmd, m)["probability"] == pytest.approx(p_torch, abs=1e-4)
+        assert predict(cmd, m)["danger_probability"] == pytest.approx(p_torch, abs=1e-4)
 
 
 def test_onnx_runs_on_cpu_only(toy_export):
@@ -64,9 +64,9 @@ def test_output_shape(toy_export):
     from shellguard.model_c import load, predict
 
     out = predict("rm -rf /home", load(toy_export[2]))
-    assert set(out) == {"label", "probability"}
-    assert 0.0 <= out["probability"] <= 1.0
-    assert (out["label"] == "dangerous") == (out["probability"] >= 0.5)
+    assert set(out) == {"label", "danger_probability"}
+    assert 0.0 <= out["danger_probability"] <= 1.0
+    assert (out["label"] == "dangerous") == (out["danger_probability"] >= 0.5)
 
 
 def test_inference_does_not_need_pytorch(toy_export):

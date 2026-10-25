@@ -1,7 +1,7 @@
 """The spec: the shipped model must get every golden command right.
 
-predict(command) -> {"label": "dangerous" | "safe", "probability": float}
-probability is P(dangerous), in [0, 1].
+predict(command) -> {"label": "dangerous" | "safe", "danger_probability": float}
+danger_probability is P(dangerous), in [0, 1].
 
 Known mistakes are listed with the reason. They are strict xfails: if a future model
 gets one right, the test fails until it is removed from this list.
@@ -34,8 +34,8 @@ def test_golden(row):
     from shellguard import predict  # imported here so each case fails on its own
 
     out = predict(row["command"])
-    assert 0.0 <= out["probability"] <= 1.0
-    assert out["label"] == row["label"], f'{row["why"]} (p={out["probability"]:.2f})'
+    assert 0.0 <= out["danger_probability"] <= 1.0
+    assert out["label"] == row["label"], f'{row["why"]} (p={out["danger_probability"]:.2f})'
 
 
 def test_known_mistakes_are_golden_commands():

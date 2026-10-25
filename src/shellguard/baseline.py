@@ -28,4 +28,4 @@ DANGER = re.compile("|".join(PATTERNS), re.IGNORECASE)
 
 def predict(command: str) -> dict:
     hit = DANGER.search(command) is not None
-    return {"label": "dangerous" if hit else "safe", "probability": float(hit)}
+    return {"label": "dangerous" if hit else "safe", "danger_probability": float(hit)}

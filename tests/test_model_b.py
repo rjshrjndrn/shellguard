@@ -46,9 +46,9 @@ def test_output_shape(toy_model):
     from shellguard.model_b import predict
 
     out = predict("rm -rf /home", toy_model)
-    assert set(out) == {"label", "probability"}
-    assert 0.0 <= out["probability"] <= 1.0
-    assert (out["label"] == "dangerous") == (out["probability"] >= 0.5)
+    assert set(out) == {"label", "danger_probability"}
+    assert 0.0 <= out["danger_probability"] <= 1.0
+    assert (out["label"] == "dangerous") == (out["danger_probability"] >= 0.5)
 
 
 def test_save_and_load_give_identical_predictions(toy_model, tmp_path):

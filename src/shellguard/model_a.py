@@ -50,7 +50,7 @@ def predict(command: str, model: Pipeline | None = None) -> dict:
     if model is None:
         model = _model = _model or load()
     p = float(model.predict_proba([command])[0][list(model.classes_).index("dangerous")])
-    return {"label": "dangerous" if p >= THRESHOLD else "safe", "probability": p}
+    return {"label": "dangerous" if p >= THRESHOLD else "safe", "danger_probability": p}
 
 
 if __name__ == "__main__":

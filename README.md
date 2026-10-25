@@ -1,11 +1,11 @@
 # shellguard
 
 Give it one shell command, get back whether it is **dangerous** or **safe**,
-with a probability. Small, local, CPU-only.
+with the probability that it is dangerous. Small, local, CPU-only.
 
 ```
 $ shellguard "git clean -fdx"
-{"command": "git clean -fdx", "label": "dangerous", "probability": 0.4983501931354235}
+{"command": "git clean -fdx", "label": "dangerous", "danger_probability": 0.498}
 $ echo $?
 1
 ```
@@ -122,7 +122,7 @@ Tests:
 - `tests/test_golden_data.py` — file is well-formed: valid labels, no
   duplicates, ≥15 per class, `git clean -fdx` is dangerous, `rm -rf node_modules` is safe.
 - `tests/test_golden.py` — one test per command, calls
-  `shellguard.predict(cmd)` and expects `{"label": ..., "probability": P(dangerous)}`.
+  `shellguard.predict(cmd)` and expects `{"label": ..., "danger_probability": P(dangerous)}`.
 
 At this step: 4 data tests pass, 48 golden tests **fail** (no model yet). That is
 correct — tests first, then code.
@@ -381,7 +381,7 @@ What this teaches:
   a better model (B, C), checked against golden afterwards.
 
 Tests (written first, `tests/test_model_a.py`): learns a 10-row toy set;
-output is `{label, probability}` with label = probability ≥ 0.5; save→load gives
+output is `{label, danger_probability}` with label = danger_probability ≥ 0.5; save→load gives
 identical predictions; trained model's test recall beats the baseline's
 (read from committed `results/*.json`).
 
@@ -734,7 +734,7 @@ the price of counting shell-safety's `ask` as dangerous. Only data can fix them.
 
 ```python
 from shellguard import predict
-predict("git clean -fdx")  # {'label': 'dangerous', 'probability': 0.498…}
+predict("git clean -fdx")  # {'label': 'dangerous', 'danger_probability': 0.498…}
 ```
 
 `tests/test_golden.py` (the spec since step 1) now runs against it: 42 pass, the
@@ -750,15 +750,19 @@ uv tool install --python 3.12 .            # or install globally, then: shellgua
 ```
 
 ```
-$ shellguard "git clean -fdx"                → {"command": "git clean -fdx", "label": "dangerous", "probability": 0.498…}   exit 1
-$ shellguard ls -la                          → {"command": "ls -la", "label": "safe", "probability": 0.005…}                 exit 0
+$ shellguard "git clean -fdx"                → {"command": "git clean -fdx", "label": "dangerous", "danger_probability": 0.498}   exit 1
+$ shellguard ls -la                          → {"command": "ls -la", "label": "safe", "danger_probability": 0.01}                  exit 0
 $ printf 'cd /tmp\nrm -rf ~\n' | shellguard → reads stdin, keeps newlines (multi-line scripts)                          exit 1
 $ shellguard </dev/null                      → usage message on stderr                                                   exit 2
 ```
 
 Code: `src/shellguard/__main__.py` (20 lines). Contract:
 - input = all arguments joined by spaces, or stdin if none (trailing newline dropped)
-- stdout = exactly one JSON line: `command`, `label`, `probability` (= P(dangerous))
+- stdout = exactly one JSON line: `command`, `label`, `danger_probability`
+  (= P(dangerous), 3 decimals). Not a confidence in the label: `safe` with
+  0.222 means "22% dangerous", and anything ≥ 0.35 is labelled dangerous.
+  It is a model score, not calibrated: on the test split, commands scored
+  0.15–0.25 were really dangerous ~4% of the time.
 - exit code = **0 safe, 1 dangerous, 2 usage error** (grep's convention), so a hook
   can do `shellguard "$cmd" >/dev/null || ask_user`
 
@@ -783,7 +787,7 @@ What exists now:
    shell tokens, 149,125 features), their IDF numbers, one weight per feature, one
    intercept. Plus the formula in `src/shellguard/model_a.py` and the tokenizer in
    `src/shellguard/tokens.py`. joblib = pickle: only load files you built.
-2. **A Python function** — `from shellguard import predict` → `{"label", "probability"}`.
+2. **A Python function** — `from shellguard import predict` → `{"label", "danger_probability"}`.
 3. **A CLI** — `shellguard "<cmd>"` → one JSON line, exit 0/1/2.
 
 Current scores (`results/model_a.json`, threshold 0.35):

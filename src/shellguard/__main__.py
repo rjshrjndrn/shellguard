@@ -16,7 +16,8 @@ def main() -> int:
     from shellguard import predict  # after arg check: loading the model takes ~1 s
 
     out = predict(command)
-    print(json.dumps({"command": command, **out}))
+    p = round(out["danger_probability"], 3)  # 3 decimals: more digits are noise
+    print(json.dumps({"command": command, "label": out["label"], "danger_probability": p}))
     return 1 if out["label"] == "dangerous" else 0
 
 

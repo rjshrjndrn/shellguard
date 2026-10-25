@@ -19,7 +19,10 @@ def test_argument(command, label, code):
     r = run(command)
     out = json.loads(r.stdout)
     assert out["command"] == command and out["label"] == label
-    assert 0.0 <= out["probability"] <= 1.0
+    # "probability" alone reads as confidence in the label; this is P(dangerous)
+    assert set(out) == {"command", "label", "danger_probability"}
+    assert 0.0 <= out["danger_probability"] <= 1.0
+    assert out["danger_probability"] == round(out["danger_probability"], 3)
     assert r.returncode == code
 
 

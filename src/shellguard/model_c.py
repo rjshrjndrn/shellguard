@@ -97,7 +97,7 @@ def predict(command: str, loaded=None) -> dict:
     logits = session.run(["logits"], feeds)[0][0]
     e = np.exp(logits - logits.max())
     p = float(e[1] / e.sum())
-    return {"label": "dangerous" if p >= 0.5 else "safe", "probability": p}
+    return {"label": "dangerous" if p >= 0.5 else "safe", "danger_probability": p}
 
 
 if __name__ == "__main__":

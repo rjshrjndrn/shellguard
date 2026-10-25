@@ -49,7 +49,7 @@ def predict(command: str, head: LogisticRegression | None = None) -> dict:
     if head is None:
         head = _head = _head or load()
     p = float(head.predict_proba(embed([command]))[0][list(head.classes_).index("dangerous")])
-    return {"label": "dangerous" if p >= 0.5 else "safe", "probability": p}
+    return {"label": "dangerous" if p >= 0.5 else "safe", "danger_probability": p}
 
 
 if __name__ == "__main__":

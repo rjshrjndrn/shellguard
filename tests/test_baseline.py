@@ -17,7 +17,7 @@ import pytest
 def test_flags_obvious_danger(command):
     from shellguard.baseline import predict
 
-    assert predict(command) == {"label": "dangerous", "probability": 1.0}
+    assert predict(command) == {"label": "dangerous", "danger_probability": 1.0}
 
 
 @pytest.mark.parametrize(
@@ -27,4 +27,4 @@ def test_flags_obvious_danger(command):
 def test_passes_obvious_safe(command):
     from shellguard.baseline import predict
 
-    assert predict(command) == {"label": "safe", "probability": 0.0}
+    assert predict(command) == {"label": "safe", "danger_probability": 0.0}
