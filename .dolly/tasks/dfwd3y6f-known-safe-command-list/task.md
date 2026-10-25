@@ -6,16 +6,16 @@ status: validating
 owner: rjshrjndrn
 collaborators: [rjshrjndrn]
 tags: []
-steps: 3
+steps: 4
 spec_version: 1
 created: 2026-10-25T15:15:12Z
-updated: 2026-10-25T17:49:37Z
+updated: 2026-10-25T17:58:08Z
 ---
 
 # dfwd3y6f · known-safe command list
 
 <!-- dolly:header -->
-`validating` · spec v1 · @rjshrjndrn · 3 steps · updated 2026-10-25 17:49Z
+`validating` · spec v1 · @rjshrjndrn · 4 steps · updated 2026-10-25 17:58Z
 <!-- /dolly:header -->
 
 ## Spec
@@ -42,4 +42,6 @@ Grow chain.harmless into a Codex-style known-safe check: read-only commands + fl
   files: `src/shellguard/chain.py`, `src/shellguard/check.py`, `tests/test_chain.py`, `tests/test_check.py`, `tests/test_daemon.py`, `README.md` · full: `steps.md#0002`
 - `2026-10-25 17:49Z` @rjshrjndrn: Everyday git (status/add/commit/switch/stash...) is safe by rule; push, --amend, checkout -- ., restore, branch -d, stash drop, add of a secret always ask. Model had learned git words from 30/30 dangerous commit rows. Golden/hard unchanged.
   files: `src/shellguard/chain.py`, `tests/test_chain.py`, `tests/test_check.py`, `README.md` · full: `steps.md#0003`
+- `2026-10-25 17:58Z` @rjshrjndrn: Dataset git labels now follow the git rule (after the split, so no row moves): train 135 rows changed. Retrained model A agrees with the rule alone (git commit 0.56->0.26, git add id_rsa 0.28->0.85); exams unchanged.
+  files: `src/shellguard/relabel.py`, `src/shellguard/prepare.py`, `tests/test_relabel.py`, `tests/test_prepare.py`, `src/shellguard/model_a.joblib`, `results/model_a.json` +1 more · full: `steps.md#0004`
 

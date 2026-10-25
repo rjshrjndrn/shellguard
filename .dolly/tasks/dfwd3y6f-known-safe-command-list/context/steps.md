@@ -95,3 +95,27 @@ our test dangerous caught 4492 -> 4483/4535 (9 = git add -A / git add . && git c
 dangerous by dataset; safe by user's rule). Benign newly flagged: 1 (`git checkout -- files`).
 Next (approved plan): subtask 2 relabel git rows in train data per this table, subtask 3 retrain.
 <!-- /dolly:step 0003 -->
+
+<!-- dolly:step 0004 -->
+## 0004 · 2026-10-25T17:58:08Z · @rjshrjndrn
+
+- task status: validating
+- files: `src/shellguard/relabel.py`, `src/shellguard/prepare.py`, `tests/test_relabel.py`, `tests/test_prepare.py`, `src/shellguard/model_a.joblib`, `results/model_a.json`, `README.md`
+
+Subtasks 2+3 of the git plan.
+- src/shellguard/relabel.py: git_label(cmd) -> "dangerous" if any git part is destructive(),
+  "safe" if every part harmless() and one is git, else None (keep). git detection ignores quoted
+  text (echo 'git push' > runbook.md is not git).
+- prepare.py: relabel_git() runs AFTER train_test_split (first version ran before; stratify on
+  the new labels moved ~10k rows between train/test - caught by measuring, then a test:
+  test_git_relabel_moves_no_row_between_train_and_test). Changed rows tagged relabel:git.
+- Counts: train 39 d->s, 96 s->d; test 8 d->s, 27 s->d (= the preview the user approved).
+- Retrained model A. Alone: git commit -m 0.555->0.262, add -A 0.818->0.406, checkout -b
+  0.442->0.170, stash 0.344->0.128, add id_rsa 0.279->0.848, push 0.791->0.976, amend
+  0.678->0.539 (rule says 1.0 anyway). Test F1 0.964->0.965 (relabelled test), golden 0.893,
+  hard 0.904 unchanged. ShellRisk benign by check() 1309->1318: 42 up / 33 down, 2 git each =
+  retrain noise (source .venv/bin/activate && ... chains).
+- Note: predict_proba column order is alphabetical (dangerous, safe) - use model_a.predict_many
+  or classes_.index("dangerous"), never [:, 1].
+Remaining lever for agent false alarms is unchanged: agent traffic as safe training data.
+<!-- /dolly:step 0004 -->
