@@ -53,3 +53,38 @@ def test_split_chain(command, parts):
 @pytest.mark.parametrize("command", ['echo "unclosed && rm -rf ~', "echo $(a && b", "echo 'x", "ls;; ; && pwd;"])
 def test_invalid_stays_whole(command):
     assert split_chain(command) == [command]
+
+
+# harmless(part): a command that cannot change anything on its own, so its (noisy,
+# short-input) model score is ignored. Anything that writes, substitutes or sets env
+# is not harmless and gets scored.
+from shellguard.chain import harmless  # noqa: E402
+
+
+@pytest.mark.parametrize("part", [
+    "echo hi", 'echo "exit $?"', 'echo "removed (exit $?)"', "echo $?", "printf '%s\\n' ok",
+    "true", "false", ":", "pwd", "cd /tmp", "ls -la /tmp", "test -f x", "[ -d x ]",
+    "sleep 1", "which rm", "type ls", "[[ -n $x ]]",
+])
+def test_harmless(part):
+    assert harmless(part)
+
+
+@pytest.mark.parametrize("part", [
+    "rm -rf /tmp/tester",
+    "echo x >> ~/.bashrc",              # writes a file
+    "echo hi 2>&1",                     # any redirect: not worth special-casing
+    "echo $(rm -rf ~)",                 # command substitution runs code
+    "echo `rm -rf ~`",
+    "ls <(rm -rf ~)",                   # process substitution runs code
+    "LD_PRELOAD=/tmp/evil.so ls",       # env changes what runs
+    "ls | xargs rm",                    # pipeline
+    "cat ~/.ssh/id_rsa",                # not on the list
+    "command rm -rf ~",                 # runs anything
+    "echo a; echo b",                   # one command only
+    "echo 'unclosed",                   # invalid
+    "[ -n \"$(rm -rf ~)\" ]",           # substitution inside a test
+    "",
+])
+def test_not_harmless(part):
+    assert not harmless(part)

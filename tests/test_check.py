@@ -5,6 +5,8 @@ dangerous is the chain split, to name which parts to show and remember:
   flagged = every part scoring >= threshold, highest first, no duplicates;
             the whole chain if no part is dangerous on its own (danger is the combination).
 """
+import pytest
+
 from shellguard.check import check
 
 
@@ -18,8 +20,28 @@ def fake(table: dict[str, float]):
 
 
 def test_safe_command_has_no_flagged_parts():
-    out = check("ls -la", fake({"ls -la": 0.01}))
+    out = check("git status", fake({"git status": 0.01}))
     assert out == {"label": "safe", "danger_probability": 0.01, "flagged": []}
+
+
+def test_only_harmless_commands_are_safe_without_scoring():
+    # short commands get noisy scores (echo hi 0.809 > rm -rf 0.711); they can't harm
+    s = fake({"echo hi": 0.809, "cd /tmp && pwd": 0.6})
+    for cmd in ["echo hi", "cd /tmp && pwd"]:
+        assert check(cmd, s) == {"label": "safe", "danger_probability": 0.0, "flagged": []}
+    assert s.calls == []
+
+
+def test_harmless_part_is_never_flagged():
+    cmd = 'rm -rf /tmp/tester; echo "exit $?"'
+    out = check(cmd, fake({cmd: 0.731, 'echo "exit $?"': 0.758, "rm -rf /tmp/tester": 0.711}))
+    assert out["flagged"] == [{"part": "rm -rf /tmp/tester", "danger_probability": 0.711}]
+
+
+def test_echo_that_writes_a_file_is_still_flagged():
+    cmd = "echo x >> ~/.bashrc && ls"
+    out = check(cmd, fake({cmd: 0.9, "echo x >> ~/.bashrc": 0.955}))
+    assert [f["part"] for f in out["flagged"]] == ["echo x >> ~/.bashrc"]
 
 
 def test_safe_chain_is_not_split():
@@ -71,7 +93,7 @@ def test_parts_scored_in_one_batch():
     cmd = "cd /tmp && rm -rf build && ls"
     s = fake({cmd: 0.62, "rm -rf build": 0.82})
     check(cmd, s)
-    assert s.calls == [[cmd], ["cd /tmp", "rm -rf build", "ls"]]
+    assert s.calls == [[cmd], ["rm -rf build"]]  # cd and ls are harmless: not scored
 
 
 def test_probabilities_rounded_to_3_decimals():
@@ -85,3 +107,23 @@ def test_real_model_names_rm_in_chain():
     out = check("cd /tmp && rm -rf build && ls")
     assert out["label"] == "dangerous"
     assert [f["part"] for f in out["flagged"]] == ["rm -rf build"]
+
+
+# the pi session where "s" seemed not to work: the agent varied a harmless echo each
+# call, and each new echo was flagged. Only the rm must be flagged, so s asks once.
+SESSION = [
+    'ls -la /tmp/tester 2>&1 | head; rm -rf /tmp/tester && echo "removed (exit $?)"',
+    "rm -rf /tmp/tester; ls -d /tmp/tester 2>&1",
+    'rm -rf /tmp/tester; echo "exit $?"; ls -d /tmp/tester 2>&1',
+]
+
+
+@pytest.mark.parametrize("cmd", SESSION)
+def test_real_session_flags_only_the_rm(cmd):
+    out = check(cmd)
+    assert [f["part"] for f in out["flagged"]] == ["rm -rf /tmp/tester"]
+
+
+def test_real_model_still_flags_echo_into_rc_file():
+    out = check("echo x >> ~/.bashrc && ls")
+    assert "echo x >> ~/.bashrc" in [f["part"] for f in out["flagged"]]

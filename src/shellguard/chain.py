@@ -32,3 +32,34 @@ def split_chain(command: str) -> list[str]:
 
     walk(root)
     return [p for p in parts if p]
+
+
+# Commands that cannot change anything on their own. Model A scores short commands
+# noisily (`echo hi` 0.81 > `rm -rf /tmp/x` 0.71), so these are never flagged.
+HARMLESS = {"echo", "printf", "true", "false", ":", "pwd", "cd", "ls", "test", "[",
+            "sleep", "which", "type"}
+# a redirect writes files; substitutions run code; an env assignment can change what
+# runs (LD_PRELOAD=evil.so ls)
+_UNSAFE = {"file_redirect", "heredoc_redirect", "herestring_redirect",
+           "command_substitution", "process_substitution", "variable_assignment"}
+
+
+def harmless(part: str) -> bool:
+    """True if `part` is one plain command from HARMLESS, with nothing that writes or runs code."""
+    root = _PARSER.parse(part.encode()).root_node
+    if root.has_error or len(root.named_children) != 1:
+        return False
+    node = root.named_children[0]
+    if node.type == "command":
+        name = node.child_by_field_name("name")
+        if name is None or name.text.decode() not in HARMLESS:
+            return False
+    elif node.type != "test_command":  # [ ... ] / [[ ... ]]; else pipeline, redirect, loop...
+        return False
+    stack = list(node.named_children)
+    while stack:
+        n = stack.pop()
+        if n.type in _UNSAFE:
+            return False
+        stack.extend(n.named_children)
+    return True
