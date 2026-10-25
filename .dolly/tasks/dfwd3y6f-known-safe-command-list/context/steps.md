@@ -33,3 +33,33 @@ Next lever is retraining on agent traffic (paused; user wants to try this first)
 Uncommitted Makefile/tests/test_install.py (--compile-bytecode) predate this task; left alone.
 Scratch scripts: /tmp/srb/measure.py, /tmp/srb/allow.py.
 <!-- /dolly:step 0001 -->
+
+<!-- dolly:step 0002 -->
+## 0002 · 2026-10-25T15:56:20Z · @rjshrjndrn
+
+- task status: validating
+- files: `src/shellguard/chain.py`, `src/shellguard/check.py`, `tests/test_chain.py`, `tests/test_check.py`, `tests/test_daemon.py`, `README.md`
+
+User found bypass: `find ~ -maxdepth 1 -name important -delete` scored 0.238 (safe).
+Root cause: training labels contradict - find ... -delete safe 419x / dangerous 383x with the
+same targets on both sides; -maxdepth (193 safe / 28 dangerous) and -empty (43/4) then dominate.
+rmdir / rm -d absent from data.
+Fix (user picked option 1, all destructive families): chain.destructive(part) walks every
+`command` node in the tree (loops, $(), pipes, subshells), unwraps sudo/doas/env/command/nohup/
+time/nice/timeout/exec/stdbuf/ionice/xargs (skipping their value-taking options), matches
+rm rmdir unlink shred truncate, mkfs*, dd of= (not of=/dev/null), find -delete / -exec|-execdir|
+-ok|-okdir <deleter>, git [globals] clean with -f/--force and no -n/--dry-run, git reset --hard.
+Parse error -> False (model scores it). `command -v rm` -> not destructive.
+check(): destructive parts -> 1.0, flagged, never scored; model only asked if a non-ruled,
+non-harmless part remains (or nothing ruled at all).
+Mechanics tests in test_check.py / test_daemon.py switched from rm to chmod -R 777 so they still
+exercise the model path with the fake scorer.
+Measured: ShellRisk benign flagged 1335 -> 1338/4001 (3 new: agent `rm -f test_*.py`); risky
+137/193 unchanged; golden 25/25 (safe flagged 4 -> 5: rm -rf ./build), hard 42/42 (7 -> 8:
+rm -i old_notes.txt), our test safe flagged 312 -> 509/3876 (dataset labels many cleanups safe).
+README: WARNING callout at top (classifier, not a guarantee; LLM agents can route around it:
+scripts, python shutil, r=rm; $r, base64 | sh, Makefile), rule section, examples updated.
+Known gaps (not covered by rule): r=rm; $r -rf ~ ; bash -c "rm ..." (string arg, not parsed);
+python -c shutil.rmtree; > file truncation via redirect; mv over a file; git push --force;
+git checkout -- . / git restore . ; chmod/chown. Model still scores those.
+<!-- /dolly:step 0002 -->
