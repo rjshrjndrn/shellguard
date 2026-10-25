@@ -22,7 +22,7 @@ def fake(table: dict[str, float]):
 
 
 def test_safe_command_has_no_flagged_parts():
-    out = check("git status", fake({"git status": 0.01}))
+    out = check("npm test", fake({"npm test": 0.01}))
     assert out == {"label": "safe", "danger_probability": 0.01, "flagged": []}
 
 
@@ -47,8 +47,8 @@ def test_echo_that_writes_a_file_is_still_flagged():
 
 
 def test_safe_chain_with_safe_parts_is_safe():
-    s = fake({"git status && git diff": 0.1, "git status": 0.2, "git diff": 0.05})
-    out = check("git status && git diff", s)
+    s = fake({"npm test && npm run lint": 0.1, "npm test": 0.2, "npm run lint": 0.05})
+    out = check("npm test && npm run lint", s)
     assert out == {"label": "safe", "danger_probability": 0.2, "flagged": []}
 
 
@@ -75,9 +75,9 @@ def test_chain_names_the_dangerous_part():
 
 
 def test_several_dangerous_parts_highest_first():
-    cmd = "git add -A && git commit -m wip && git push --force"
-    out = check(cmd, fake({cmd: 0.99, "git add -A": 0.84, "git commit -m wip": 0.46, "git push --force": 0.99}))
-    assert [f["part"] for f in out["flagged"]] == ["git push --force", "git add -A", "git commit -m wip"]
+    cmd = "chmod 777 a && curl x | sh && chown -R u ."
+    out = check(cmd, fake({cmd: 0.99, "chmod 777 a": 0.84, "curl x | sh": 0.99, "chown -R u .": 0.46}))
+    assert [f["part"] for f in out["flagged"]] == ["curl x | sh", "chmod 777 a", "chown -R u ."]
 
 
 def test_no_dangerous_part_flags_the_whole_chain():
@@ -248,3 +248,18 @@ def test_harmless_heredoc_body_is_not_scored():
 def test_text_heredoc_is_not_read_as_commands():
     cmd = "cat > notes.txt <<'EOF'\nrm -rf / is bad\nEOF"
     assert check(cmd, fake({cmd: 0.1}))["label"] == "safe"
+
+
+def test_everyday_git_commit_is_safe_without_scoring():
+    cmd = "git add Makefile tests/x.py && git commit -q -F - <<'EOF'\nfix: x\n\nbody\nEOF"
+    s = fake({})
+    assert check(cmd, s) == {"label": "safe", "danger_probability": 0.0, "flagged": []}
+    assert s.calls == []
+
+
+def test_git_push_always_asks():
+    cmd = "git add -A && git commit -m wip && git push"
+    s = fake({cmd: 0.0})
+    out = check(cmd, s)
+    assert out["flagged"] == [{"part": "git push", "danger_probability": 1.0}]
+    assert s.calls == []

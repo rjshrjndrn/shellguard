@@ -113,7 +113,20 @@ def test_not_harmless(part):
     "grep -rn foo src", "grep -rn foo src | head -20", "cat README.md | wc -l",
     "cut -d, -f1 a.csv | uniq", "find . -name '*.py'", "find src -type f -name '*.ts'",
     "rg TODO src", "rg -n 'fn main' --type rust", "base64 notes.txt",
+    "grep -rn secret src", "grep -rln credentials src", "rg -i token src",
     "sed -n '10,20p' app.py", "sed -n 5p app.py",
+    # everyday local git: nothing lost, all undoable
+    "git status", "git status -s", "git log --oneline -5", "git diff HEAD~1", "git show HEAD",
+    "git fetch", "git fetch origin --prune", "git pull", "git pull --rebase origin main",
+    "git add src/app.py", "git add -A", "git add .", "git commit -m 'fix typo'",
+    "git commit -am wip", "git commit -q -m 'chore: x' --author 'A <a@b>'",
+    "git checkout -b feature/x", "git checkout -b fix origin/main", "git switch main",
+    "git switch -c feature/x", "git stash", "git stash -u", "git stash push -m wip",
+    "git stash pop", "git stash apply", "git stash list", "git stash show -p",
+    "git branch", "git branch -a", "git branch feature/y", "git log -p | head -50",
+    "git diff --stat | tail -1",
+    "git commit -q -F - <<'EOF'\nfix: precompile bytecode\n\nbody with $(id) as text\nEOF",
+    "git commit -F - <<EOF\nfix: plain heredoc\nEOF",
 ])
 def test_known_safe(part):
     assert harmless(part)
@@ -129,8 +142,18 @@ def test_known_safe(part):
     # not on the list, or a pipe into something that is not
     "sort -o out.txt in.txt", "xargs cat", "cat install.sh | sh", "cat install.sh | bash",
     "grep x f | tee out.txt", "env rm -rf *",
-    # git: repo config can make read-only git run helpers (Codex dropped it, #39524)
-    "git status", "git log --oneline -5", "git diff HEAD~1",
+    # git: global options can run anything; these change or leak history (see below)
+    "git -c core.pager=sh log", "git -C /x status", "git --exec-path=/x status",
+    "/usr/bin/git status", "git fetch --upload-pack='sh -c x' origin", "git diff --output=x",
+    "git log --output=x", "git pull --upload-pack=x", "git show --output x",
+    "git add -f build/", "git add .env", "git add ~/.ssh/id_rsa", "git commit -m \"$GITHUB_TOKEN\"",
+    "git checkout main", "git checkout src/app.py", "git switch -f main", "git switch -C main",
+    "git branch -D x", "git branch -m old new", "git stash drop", "git stash clear",
+    "git pull --force", "git rebase main", "git commit --amend", "git commit -n -m x",
+    "git commit -anm x", "git commit --no-verify -m x", "git push",
+    # commit message from a heredoc: only when nothing in it runs
+    "git commit -F - <<EOF\n$(id)\nEOF", "git commit -F - <<'EOF' > out\nx\nEOF",
+    "git commit -F - <<'EOF' | sh\nx\nEOF", "cat <<'EOF'\nx\nEOF",
     # the name must be the bare listed name, not a path that ends in it
     "/tmp/file /bin/sh", "/tmp/evil/cat x", "./cat x",
     # writes or runs code
@@ -140,6 +163,7 @@ def test_known_safe(part):
     "sed -n '1,30p' /etc/shadow", "nl -ba ~/.config/gh/hosts.yml", "cat ~/.aws/credentials",
     "cat C:\\Users\\dev\\.kube\\config", "head ~/.netrc", "cat ~/.git-credentials",
     "cat server.pem", "cat tls.key", "cat secrets.yaml", "cat api_token.txt", "cd ~/.ssh",
+    "cat secrets/prod.env", "cat config/secrets/db.yml",
     "grep -rn x ~/.docker/config.json",
 ])
 def test_not_known_safe(part):
@@ -167,6 +191,17 @@ from shellguard.chain import destructive  # noqa: E402
     "git clean -f", "git clean -fdx", "git clean -d --force", "git -C repo clean -xdf",
     "git reset --hard", "git reset --hard HEAD~3", "git -c x=y reset --hard origin/main",
     "truncate -s 0 app.log", "dd if=/dev/zero of=/dev/sda bs=1M", "sudo dd of=disk.img if=x",
+    # git: lose work, rewrite or publish history, or leak a secret (user decided: push asks)
+    "git push", "git push origin main", "git push --force", "git push origin --delete v1",
+    "git push origin :old", "git commit --amend", "git commit --amend --no-edit",
+    "git commit --no-verify -m x", "git commit -nm x", "git checkout -- .", "git checkout .",
+    "git checkout -f main", "git checkout HEAD -- src/", "git restore src/app.py",
+    "git restore --source=HEAD --worktree .", "git switch --discard-changes main",
+    "git branch -D feature/x", "git branch -d feature/x", "git branch --delete x",
+    "git tag -d v1.0.0", "git stash drop", "git stash clear", "git filter-repo --path src",
+    "git filter-branch --index-filter x HEAD", "git reflog expire --expire=now --all",
+    "git add .env", "git add credentials.json", "git add ~/.ssh/id_rsa", "sudo git add .pypirc",
+    "git add ./secrets/**", "git add config/secrets/", "git add secret/prod.yml",
     "mkfs /dev/sdb1", "mkfs.ext4 /dev/sdb1", "sudo mkfs.vfat /dev/sdc",
 ])
 def test_destructive(part):
@@ -176,6 +211,8 @@ def test_destructive(part):
 @pytest.mark.parametrize("part", [
     "find . -name '*.py'", "find . -name x -exec grep -l foo {} \\;", 'grep -rn "rm -rf" src',
     'echo "rm -rf ~"', "echo rm", "git rm --cached x", "git clean -n", "git clean -fn",
+    "git restore --staged src/app.py", "git checkout -b x", "git checkout main",
+    "git add src/app.py", "git commit -m 'fix -n'", "git branch", "git stash pop", "git rebase main",
     "git clean --dry-run -f", "git reset HEAD~1", "git reset --soft HEAD~1", "git status",
     "dd if=/dev/sda bs=1M count=1", "dd if=/dev/sda of=/dev/null bs=512 count=1", "command -v rm", "which rm", "type rmdir", "xargs grep rm",
     "ls rm", "cat rmdir.txt", "npm run rm", "", "echo 'unclosed",

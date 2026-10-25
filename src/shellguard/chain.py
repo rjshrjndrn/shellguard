@@ -52,9 +52,9 @@ def split_chain(command: str) -> list[str]:
 HARMLESS = {"echo", "printf", "true", "false", ":", "pwd", "cd", "ls", "test", "[",
             "sleep", "which", "type"}
 # Read-only commands, after Codex (openai/codex, Apache-2.0, codex-rs/shell-command/
-# src/command_safety/is_safe_command.rs). git is left out on purpose: repo config can
-# make even `git status` run helpers (Codex #39524). These read files, so arguments
-# must be literal: a variable could name a secret, or hide an option below.
+# src/command_safety/is_safe_command.rs). These read files, so arguments must be
+# literal: a variable could name a secret, or hide an option below. git has its own
+# rule (_git_safe) below.
 READ_ONLY = {"cat", "cut", "expr", "grep", "head", "id", "nl", "paste", "rev", "seq",
              "stat", "tail", "tr", "uname", "uniq", "wc", "whoami"}
 _FIND_UNSAFE = {"-exec", "-execdir", "-ok", "-okdir", "-delete",    # run code, delete
@@ -76,8 +76,51 @@ def _sed_ok(w: list[str]) -> bool:  # only `sed -n 10p [file]` / `sed -n 1,5p [f
             and (len(w) == 3 or not w[3].startswith("-")))
 
 
+# Everyday local git: nothing is lost and all of it can be undone. Codex leaves git
+# out entirely (#39524) because repo config (aliases, hooks, core.pager) can make
+# even `git status` run a program; that config is the user's own, and the model
+# flagged plain `git commit` 0.56 (its 30 training rows are all in dangerous chains),
+# so here everyday git is safe and anything else goes to the model or destructive().
+# No global options (-c, -C, --exec-path ... run or redirect anything).
+_GIT_SAFE = {
+    "status": set(), "log": {"--output"}, "diff": {"--output"}, "show": {"--output"},
+    "fetch": {"--upload-pack", "--force", "-f"}, "pull": {"--upload-pack", "--force", "-f"},
+    "add": {"--force", "-f"}, "commit": {"--amend", "--no-verify"},
+    "branch": None, "checkout": None, "switch": None, "stash": None,
+}
+
+
+def _git_safe(w: list[str]) -> bool:
+    if len(w) < 2 or w[1].startswith("-"):
+        return False
+    sub, args = w[1], w[2:]
+    if sub not in _GIT_SAFE:
+        return False
+    if any(_SECRET_PATH.search(a) for a in args):
+        return False  # git add .env: commits a secret
+    if _GIT_SAFE[sub] is not None:
+        bad = _GIT_SAFE[sub]
+        short = "".join(a[1:] for a in args if _SHORT.match(a))
+        if any(a.split("=")[0] in bad for a in args):
+            return False
+        if sub == "commit" and "n" in _commit_flags(args):
+            return False  # -n = --no-verify
+        return not (sub in ("add", "fetch", "pull") and "f" in short)
+    if sub == "branch":  # list, or create: no -d/-D/-m/-M/-c/-C/-f
+        return not any(_SHORT.match(a) and set(a[1:]) & set("dDmMcCf") or
+                       a in ("--delete", "--move", "--copy", "--force") for a in args)
+    if sub == "switch" and len(args) == 1:  # refuses to overwrite local changes
+        return not args[0].startswith("-")
+    if sub in ("checkout", "switch"):  # create a branch: -b/-c NAME [START]. Not
+        # `checkout NAME`: if NAME is a file, it throws away its changes
+        return len(args) in (2, 3) and args[0] in ("-b", "-c") and not args[1].startswith("-")
+    # stash: push/save/pop/apply/list/show keep the work; drop/clear lose it
+    return not args or args[0] in ("push", "save", "pop", "apply", "list", "show") \
+        or args[0].startswith("-") and args[0] in ("-u", "--include-untracked", "-k", "--keep-index")
+
+
 OPTION_RULES = {"find": lambda w: not _FIND_UNSAFE & set(w), "rg": _rg_ok,
-                "base64": _base64_ok, "sed": _sed_ok}
+                "base64": _base64_ok, "sed": _sed_ok, "git": _git_safe}
 
 # a redirect writes files; substitutions run code; an env assignment can change what
 # runs (LD_PRELOAD=evil.so ls)
@@ -93,7 +136,8 @@ _SECRET_PATH = re.compile(
     r"|(^|/)\.(env|netrc|git-credentials|npmrc|pypirc)(\.|/|$)"
     r"|^/etc/(shadow|gshadow|sudoers)"
     r"|(^|/)id_(rsa|dsa|ecdsa|ed25519)|\.(pem|key|p12|pfx)$"
-    r"|(^|[/_.-])(secrets?|tokens?|credentials?|passwords?)([_.-][^/]*)?\.\w+$", re.I)
+    r"|(^|[/_.-])(secrets?|tokens?|credentials?|passwords?)([_.-][^/]*)?\.\w+$"
+    r"|(^|/)(secrets?|credentials)/", re.I)  # inside a secrets/ folder
 _LITERAL = {"word", "number", "raw_string"}
 
 
@@ -104,8 +148,37 @@ def harmless(part: str) -> bool:
     if root.has_error or len(root.named_children) != 1:
         return False
     node = root.named_children[0]
+    if node.type == "redirected_statement":  # git commit -F - <<'EOF' msg EOF
+        return _commit_message_heredoc(node, part.encode())
     commands = node.named_children if node.type == "pipeline" else [node]
     return all(_safe(c) for c in commands)
+
+
+def _commit_message_heredoc(node, src: bytes) -> bool:
+    """`git commit [-q] -F - <<EOF ... EOF` with nothing else redirected and nothing in
+    the body that runs ($( ) or `...` in an unquoted heredoc)."""
+    body, redirects = node.child_by_field_name("body"), node.children_by_field_name("redirect")
+    if body is None or body.type != "command" or len(redirects) != 1:
+        return False
+    r = redirects[0]
+    if r.type != "heredoc_redirect" or any(c.type not in ("heredoc_start", "heredoc_body",
+                                                          "heredoc_end") for c in r.named_children):
+        return False
+    words = [_word(a) for a in body.children_by_field_name("argument")]
+    # tree-sitter drops the lone `-` before `<<`, so read it from the text
+    gap = src[body.end_byte:r.start_byte].strip()
+    if words[:1] != ["commit"] or words[-1:] != ["-F"] or gap != b"-":
+        return False
+    name = body.child_by_field_name("name")
+    if name is None or name.text.decode() != "git":
+        return False
+    stack = list(r.named_children)
+    while stack:
+        n = stack.pop()
+        if n.type in ("command_substitution", "process_substitution"):
+            return False
+        stack.extend(n.named_children)
+    return _safe(body)
 
 
 def _safe(node) -> bool:
@@ -267,10 +340,39 @@ def _git_destroys(w: list[str]) -> bool:
     while i < len(w) and w[i].startswith("-"):
         i += 2 if w[i] in _GIT_GLOBAL else 1
     sub, args = (w[i], w[i + 1:]) if i < len(w) else ("", [])
+    short = "".join(a[1:] for a in args if _SHORT.match(a) and not a.startswith("-m"))
     if sub == "reset":
         return "--hard" in args
     if sub == "clean":
-        short = "".join(a[1:] for a in args if _SHORT.match(a))
         dry = "n" in short or "--dry-run" in args
         return not dry and ("f" in short or "--force" in args)
+    if sub == "push":  # publishes; the user wants every push to ask
+        return True
+    if sub == "commit":  # rewrites the last commit / skips the repo's checks
+        return "--amend" in args or "--no-verify" in args or "n" in _commit_flags(args)
+    if sub == "checkout":  # throws away local changes
+        return "-f" in args or "--force" in args or "--" in args or "." in args
+    if sub == "restore":
+        return "--staged" not in args and "-S" not in args or "--worktree" in args or "-W" in args
+    if sub == "switch":
+        return "--discard-changes" in args or "-f" in args or "--force" in args
+    if sub in ("branch", "tag"):
+        return "--delete" in args or bool(set(short) & set("dD"))
+    if sub == "stash":
+        return args[:1] in (["drop"], ["clear"])
+    if sub == "reflog":
+        return args[:1] == ["expire"] or args[:1] == ["delete"]
+    if sub in ("filter-repo", "filter-branch"):
+        return True
+    if sub == "add":  # commits a secret
+        return any(_SECRET_PATH.search(a) for a in args)
     return False
+
+
+def _commit_flags(args: list[str]) -> str:
+    """Short flags of git commit, without the message after -m (-nm x: n, m)."""
+    out = ""
+    for a in args:
+        if _SHORT.match(a):
+            out += a[1:].split("m")[0] + ("m" if "m" in a[1:] else "")
+    return out

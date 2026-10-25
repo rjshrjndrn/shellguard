@@ -800,8 +800,7 @@ Code: `src/shellguard/__main__.py`, verdict from `src/shellguard/check.py`. Cont
   (no `$VAR`, `{a,b}`, `$( )`), the name must be bare (`./cat`, `/tmp/x/cat` are
   scored), and a secret path (`~/.ssh`, `.env*`, `~/.aws`, `~/.kube`, `.netrc`,
   `/etc/shadow`, `*.pem`, `*.key`, `secrets.yaml`, …) sends the part to the model.
-  `git` is left out: repo config can make even `git status` run helpers, so Codex
-  dropped it too (#39524).
+  `git` has its own rule, below.
   Measured on ShellRisk-Bench's benign test commands (agent + human, never trained on):
   flagged 1,493 → 1,335 of 4,001 (37.3% → 33.4%); its risky commands caught 139 → 137
   of 193 (`cat /etc/shells`, `rev /tmp/file | rev`, both GTFOBins examples); golden
@@ -824,6 +823,32 @@ Code: `src/shellguard/__main__.py`, verdict from `src/shellguard/check.py`. Cont
   delete). On our own test split's safe rows: 312 → 509 of 3,876, because the
   dataset labels many cleanups safe (`rm -r ./target/`, `dd if=/dev/sda
   of=/tmp/mbr.bak`).
+- **git: everyday local work is safe, anything that loses work, rewrites or publishes
+  history asks.** The model flagged plain `git commit -m 'fix typo'` at 0.56 and
+  `git add -A` at 0.82: its 30 `git commit` training rows are all in dangerous chains
+  (`git commit --amend && git push --force`), so it learned the git words, not the
+  danger.
+
+  | safe, model skipped | always asks (1.0) |
+  |---|---|
+  | `status`, `log`, `diff`, `show`, `fetch`, `pull` | `push` (any: publishes your work) |
+  | `add <files>`, `add -A`, `add .` | `add` of a secret (`.env`, `id_rsa`, `secrets/…`) |
+  | `commit -m/-am`, `commit -F - <<'EOF' … EOF` | `commit --amend`, `--no-verify`, `-n` |
+  | `checkout -b`, `switch NAME`, `switch -c` | `checkout -- .` / `.` / `-f`, `restore` (not `--staged`), `switch --discard-changes` |
+  | `branch` (list or create) | `branch -d/-D`, `tag -d` |
+  | `stash`, `stash push/pop/apply/list/show` | `stash drop/clear` |
+  | | `reset --hard`, `clean -f`, `filter-repo`, `filter-branch`, `reflog expire` |
+
+  Everything else (`checkout NAME`, which throws away a file's changes if NAME is a
+  file; `rebase`; `merge`; global options like `-c` / `-C`) goes to the model. Codex
+  leaves git out entirely (#39524) because repo config (aliases, hooks, `core.pager`)
+  can make even `git status` run a program; here that config is taken to be the
+  user's own. A commit message from a heredoc is only safe if nothing in it runs
+  (`$(…)` in an unquoted heredoc goes to the model). Measured: ShellRisk-Bench benign
+  flagged 1,315 → 1,309 of 4,001; golden 25/25 and hard 48/48 dangerous still caught;
+  our test split's dangerous caught 4,492 → 4,483 of 4,535. Those 9 are `git add -A`,
+  `git add . && git commit -m bump` and one `git pull --allow-unrelated-histories`,
+  which the dataset labels dangerous; by the rule above they are safe.
 - exit code = **0 safe, 1 dangerous, 2 usage error** (grep's convention), so a hook
   can do `shellguard "$cmd" >/dev/null || ask_user`
 
