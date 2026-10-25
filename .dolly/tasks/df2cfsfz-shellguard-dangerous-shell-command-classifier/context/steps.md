@@ -190,3 +190,12 @@ Tree-sitter-bash tokenizer trial: tie, kept shlex on main.
 - Decision (owner): keep shlex. Revisit tree-sitter when porting to another language (bindings exist) or after training data adds structure-dependent examples.
 Next: training data for known gaps, or JSON export for startup / portability.
 <!-- /dolly:step 0011 -->
+
+<!-- dolly:step 0012 -->
+## 0012 · 2026-10-25T07:44:26Z · @rjshrjndrn
+
+- task status: working
+- files: `src/shellguard/model_a.py`, `tests/test_install.py`, `.gitignore`, `README.md`
+
+uv tool install . produced a shellguard that raised FileNotFoundError: MODEL_PATH was ROOT/models/model_a.joblib, ROOT computed from __file__ parents, which points into site-packages' parent when installed. Fix: MODEL_PATH = Path(__file__).parent / 'model_a.joblib' (git-ignored, uv_build includes it in the wheel; verified with unzip -l). tests/test_install.py builds the wheel, installs into a fresh venv, runs the CLI from tmp dir; asserts stderr empty first because a crash also exits 1. Install test adds ~15 s to make test. README: quick start block, big picture with both datasets + hard.csv, update notes on steps 1/5, current scores table, tree-sitter moved from 'not yet' to 'tried and parked', layout fixed. Models B/C still save to models/.
+<!-- /dolly:step 0012 -->
