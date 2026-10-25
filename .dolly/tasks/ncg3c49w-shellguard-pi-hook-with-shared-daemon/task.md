@@ -2,20 +2,20 @@
 id: ncg3c49w
 slug: shellguard-pi-hook-with-shared-daemon
 title: shellguard pi hook with shared daemon
-status: validating
+status: working
 owner: rjshrjndrn
 collaborators: [rjshrjndrn]
 tags: []
-steps: 9
+steps: 10
 spec_version: 2
 created: 2026-10-25T09:11:26Z
-updated: 2026-10-25T10:18:49Z
+updated: 2026-10-25T10:35:18Z
 ---
 
 # ncg3c49w · shellguard pi hook with shared daemon
 
 <!-- dolly:header -->
-`validating` · spec v2 · @rjshrjndrn · 9 steps · updated 2026-10-25 10:18Z
+`working` · spec v2 · @rjshrjndrn · 10 steps · updated 2026-10-25 10:35Z
 <!-- /dolly:header -->
 
 ## Spec
@@ -72,4 +72,7 @@ Plan complete. Status → todo.
 - `2026-10-25 10:18Z` @rjshrjndrn: 's' looked broken: memory worked, but each call added a new harmless echo that model A flagged (echo hi 0.81 > rm -rf 0.71). Harmless plain commands are no longer flagged; popup also shows already-allowed parts. Real pi replay: 1 popup, then none.
   files: `src/shellguard/chain.py`, `src/shellguard/check.py`, `hooks/pi/menu.ts`, `hooks/pi/index.ts` · full: `steps.md#0009`
 - `2026-10-25 10:18Z` @rjshrjndrn: status working → validating. Restart pi or /reload. Ask it to rm -rf a scratch dir a few times: one popup, s, then none. Mixed new + allowed parts show the allowed ones greyed.
+- `2026-10-25 10:25Z` @rjshrjndrn: status validating → working.
+- `2026-10-25 10:35Z` @rjshrjndrn: Popup now fixed-height: long commands not printed, flagged parts one line + (+N lines). Found 2 open issues: long scripts dilute a dangerous line below threshold (rm -rf after 25-line heredoc ran unprompted), and harmless() hid 8 secret-printing echos.
+  files: `hooks/pi/menu.ts`, `hooks/pi/menu.test.ts` · full: `steps.md#0010`
 

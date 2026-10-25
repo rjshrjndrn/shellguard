@@ -93,3 +93,19 @@ User decision: session allow = exact flagged part incl. path (already the behavi
 Verified in real pi (tmux, installed via make hook-pi): the 3 session commands -> 1 popup listing only rm -rf /tmp/tester, s, then no popups; dir removed each time.
 Note: evaluate.py uses predict(), not check(), so measured metrics are unchanged.
 <!-- /dolly:step 0009 -->
+
+<!-- dolly:step 0010 -->
+## 0010 · 2026-10-25T10:35:18Z · @rjshrjndrn
+
+- task status: working
+- files: `hooks/pi/menu.ts`, `hooks/pi/menu.test.ts`
+
+Popup fix: askMenu no longer prints commands > 3 lines (pi shows them in chat); each flagged part = first line + "(+N lines)"; constant height (test: 4 vs 300 lines). User's 60-line command now renders as 8 lines. In-pi visual check not done: Anthropic usage-policy filter refused the test prompts (rm -rf / git push --force snippets); did not try to word around it.
+
+Findings, NOT fixed, need user decisions:
+1. Dilution miss: whole command decides, so a dangerous line inside a long script is diluted below 0.35 and never split.
+   "mkdir -p /tmp/sgtest && python3 - <<'EOF' (25 lines) EOF\nrm -rf /tmp/sgtest && echo gone" -> whole 0.208 safe; rm part alone 0.836. Ran in real pi without a popup.
+   "git push --force && python3 heredoc": 4 lines 0.632, 7: 0.453, 12: 0.393, 17: 0.354.
+   Test split with harmless filter: whole-decides chains recall 0.963 (31 missed, 97 FA); whole-OR-any-non-harmless-part recall 0.985 (13 missed, 128 FA). Full split: 0.986/64 missed/278 FA vs 0.990/46/309.
+2. Regression from step 9 harmless(): 8 dangerous test commands are all-harmless and were caught by the model before: echo $PASSWORD, echo $AWS_SECRET_ACCESS_KEY, printf %s $SECRET, echo -n $DB_PASSWORD, echo $GITHUB_TOKEN (6 with $VAR) + 2 printf "<API_KEY>" literals. Fix idea: expansions other than special vars ($? $# ...) make echo/printf not harmless.
+<!-- /dolly:step 0010 -->
