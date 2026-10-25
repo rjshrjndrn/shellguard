@@ -20,3 +20,21 @@ Dataset: 42,009 cmds, 8 us avg, 3,614 split into >1, 545 (1.3%) parse errors kep
 Known limit: a compound command (loop/if) is one part; no recursion into blocks.
 Next: step 2 check(cmd) -> {label, danger_probability, flagged[]} shared by CLI + daemon.
 <!-- /dolly:step 0002 -->
+
+<!-- dolly:step 0003 -->
+## 0003 · 2026-10-25T09:27:52Z · @rjshrjndrn
+
+- task status: working
+- files: `src/shellguard/check.py`, `src/shellguard/model_a.py`, `src/shellguard/__main__.py`, `tests/test_check.py`, `tests/test_cli.py`, `README.md`
+
+check(cmd, score=model) in src/shellguard/check.py -> {label, danger_probability, flagged[]}, all rounded to 3 dp.
+- Whole command scored first; label from it (measured metric unchanged).
+- Only if dangerous: split_chain, dedupe (dict.fromkeys), score parts in ONE batch via model_a.predict_many.
+- flagged = parts >= THRESHOLD sorted desc; else [whole command] (single cmd or combination danger).
+- Bug caught by test: "rm -rf a; rm -rf a" dedupes to 1 part; guard is `parts != [command]`, not len>1.
+- score is injectable (fake scorer in tests records calls -> proves safe chains are not split, parts batched).
+- CLI prints {"command", **check()}; exit codes unchanged.
+- model_a.predict_many added; predict() now wraps it.
+Verified: "git add -A && git commit -m wip && git push --force" -> flagged push 0.985, add 0.844, commit 0.462.
+Next: step 3 daemon `shellguard serve` on ~/.cache/shellguard/sock using check().
+<!-- /dolly:step 0003 -->

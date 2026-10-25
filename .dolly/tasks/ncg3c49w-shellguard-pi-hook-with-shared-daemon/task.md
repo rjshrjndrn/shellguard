@@ -6,16 +6,16 @@ status: working
 owner: rjshrjndrn
 collaborators: [rjshrjndrn]
 tags: []
-steps: 2
+steps: 3
 spec_version: 2
 created: 2026-10-25T09:11:26Z
-updated: 2026-10-25T09:24:23Z
+updated: 2026-10-25T09:27:52Z
 ---
 
 # ncg3c49w · shellguard pi hook with shared daemon
 
 <!-- dolly:header -->
-`working` · spec v2 · @rjshrjndrn · 2 steps · updated 2026-10-25 09:24Z
+`working` · spec v2 · @rjshrjndrn · 3 steps · updated 2026-10-25 09:27Z
 <!-- /dolly:header -->
 
 ## Spec
@@ -55,4 +55,6 @@ Plan complete. Status → todo.
 - `2026-10-25 09:17Z` @rjshrjndrn: status todo → working.
 - `2026-10-25 09:24Z` @rjshrjndrn: split_chain lands on tree-sitter-bash: hand scanner and shlex cut loops/if/heredocs into junk parts; grammar keeps them whole, 8 us/cmd, invalid bash stays whole.
   files: `src/shellguard/chain.py`, `tests/test_chain.py`, `pyproject.toml` · full: `steps.md#0002`
+- `2026-10-25 09:27Z` @rjshrjndrn: check() returns verdict + flagged parts; whole command decides, parts only named (batched, deduped, highest first, whole chain when none alone). CLI prints it.
+  files: `src/shellguard/check.py`, `src/shellguard/model_a.py`, `src/shellguard/__main__.py`, `tests/test_check.py`, `tests/test_cli.py`, `README.md` · full: `steps.md#0003`
 
