@@ -6,16 +6,16 @@ status: todo
 owner: rjshrjndrn
 collaborators: [rjshrjndrn]
 tags: []
-steps: 0
+steps: 1
 spec_version: 2
 created: 2026-10-25T09:11:26Z
-updated: 2026-10-25T09:11:49Z
+updated: 2026-10-25T09:15:17Z
 ---
 
 # ncg3c49w · shellguard pi hook with shared daemon
 
 <!-- dolly:header -->
-`todo` · spec v2 · @rjshrjndrn · 0 steps · updated 2026-10-25 09:11Z
+`todo` · spec v2 · @rjshrjndrn · 1 step · updated 2026-10-25 09:15Z
 <!-- /dolly:header -->
 
 ## Spec
@@ -51,4 +51,5 @@ Full spec: `context/spec.md` · plan: `context/plan.md`
 Plan complete. Status → todo.
 
 - plan: `context/plan.md`
+- `2026-10-25 09:15Z` @rjshrjndrn: Decided: flagged[] lists every dangerous part with its score, sorted; CLI and daemon share check() and both emit flagged[].
 

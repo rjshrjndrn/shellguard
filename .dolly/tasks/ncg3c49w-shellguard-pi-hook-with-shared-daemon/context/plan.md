@@ -93,3 +93,7 @@ Out:
 
 **A:** make hook-pi copies the extension into ~/.pi/agent/extensions/shellguard/. pi only for now.
 
+**Q (2026-10-25 09:15Z):** Several parts flagged?|CLI output too?
+
+**A:** List every flagged part, highest score first, each with its danger_probability. Allow for session remembers all of them; a later command skips the popup only if all its flagged parts are allowed, else the popup lists only the new parts. Both the CLI and the daemon output include flagged[] (one shared check() function).
+
