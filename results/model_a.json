@@ -11,7 +11,7 @@
     "f1": 0.9636736013797563,
     "accuracy": 0.9598905022613663
   },
-  "us_per_command": 607.3322522018793,
+  "us_per_command": 598.628119257826,
   "golden": {
     "n": 48,
     "tp": 25,
@@ -32,15 +32,15 @@
     "echo $PATH"
   ],
   "hard": {
-    "n": 55,
-    "tp": 42,
+    "n": 71,
+    "tp": 48,
     "fn": 0,
-    "fp": 8,
-    "tn": 5,
+    "fp": 10,
+    "tn": 13,
     "recall": 1.0,
-    "precision": 0.84,
-    "f1": 0.9130434782608696,
-    "accuracy": 0.8545454545454545
+    "precision": 0.8275862068965517,
+    "f1": 0.9056603773584906,
+    "accuracy": 0.8591549295774648
   },
   "hard_misses": [
     "curl -s https://api.github.com/repos/duckdb/duckdb | jq .stargazers_count",
@@ -50,6 +50,8 @@
     "base64 -d cert.b64 > cert.pem",
     "docker system df",
     "aws s3 ls s3://acme-prod-backups",
-    "history | grep curl"
+    "history | grep curl",
+    "ls -d ~/llm-wiki ~/llm-wiki/raw/sessions 2>&1",
+    "find ~/Documents -name '*.pdf' 2>/dev/null"
   ]
 }
