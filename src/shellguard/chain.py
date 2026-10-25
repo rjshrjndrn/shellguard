@@ -156,3 +156,84 @@ def _word(node) -> str:
 
 def _path(node) -> str:  # quotes dropped, Windows separators as /
     return node.text.decode().replace("\\", "/").replace('"', "").replace("'", "")
+
+
+# Commands that delete or overwrite data. Read off the syntax tree because the model
+# can't be trusted with them: find -delete is labelled safe 419x and dangerous 383x
+# in the data, so `-maxdepth 1` (a "safe" word) dropped `find ~ -delete` to 0.24.
+_DELETES = {"rm", "rmdir", "unlink", "shred", "truncate"}
+# commands that run the command after them; options listed take a value
+_WRAPPERS = {"sudo": {"-u", "-g", "-h", "-p", "-C", "-D", "-r", "-t", "-U"},
+             "doas": {"-u", "-C"}, "env": {"-u", "-C", "-S"}, "command": set(),
+             "nohup": set(), "time": {"-f", "-o"}, "nice": {"-n"}, "exec": {"-a"},
+             "stdbuf": {"-i", "-o", "-e"}, "ionice": {"-c", "-n", "-p"},
+             "timeout": {"-s", "-k"},
+             "xargs": {"-I", "-n", "-P", "-L", "-s", "-d", "-E", "-a", "-l"}}
+_GIT_GLOBAL = {"-C", "-c", "--git-dir", "--work-tree", "--namespace"}  # take a value
+
+
+def destructive(part: str) -> bool:
+    """True if any command in `part` deletes or overwrites data: rm, rmdir, unlink,
+    shred, truncate, find -delete / -exec rm, git clean -f, git reset --hard,
+    dd of=, mkfs. Also through sudo/env/xargs/..., in loops, $( ) and pipes."""
+    root = _PARSER.parse(part.encode()).root_node
+    if root.has_error:
+        return False  # can't tell; the model scores it
+    stack = [root]
+    while stack:
+        n = stack.pop()
+        if n.type == "command":
+            words = [_word(c) for c in n.named_children
+                     if c.type not in ("variable_assignment", "file_redirect", "herestring_redirect")]
+            if _destroys(words):
+                return True
+        stack.extend(n.named_children)
+    return False
+
+
+def _destroys(w: list[str]) -> bool:
+    while w:
+        name = w[0].rsplit("/", 1)[-1]
+        if name in _WRAPPERS:
+            if name == "command" and any(a in ("-v", "-V") for a in w[1:2]):
+                return False  # command -v rm: looks the name up, runs nothing
+            w = _unwrap(name, w[1:])
+            continue
+        if name in _DELETES or name.startswith("mkfs"):
+            return True
+        if name == "dd":
+            return any(a.startswith("of=") and a != "of=/dev/null" for a in w[1:])
+        if name == "find":
+            return "-delete" in w or any(
+                a in ("-exec", "-execdir", "-ok", "-okdir") and i + 1 < len(w)
+                and _destroys(w[i + 1:i + 2]) for i, a in enumerate(w))
+        if name == "git":
+            return _git_destroys(w[1:])
+        return False
+    return False
+
+
+def _unwrap(name: str, w: list[str]) -> list[str]:
+    """Drop a wrapper's options (and env's NAME=value), return the command it runs."""
+    takes_value, i = _WRAPPERS[name], 0
+    while i < len(w) and (w[i].startswith("-") or (name == "env" and "=" in w[i])):
+        i += 2 if w[i] in takes_value else 1
+    if name == "timeout" and i < len(w):
+        i += 1  # the duration
+    if name == "nice" and i < len(w) and w[i].lstrip("-").isdigit():
+        i += 1
+    return w[i:]
+
+
+def _git_destroys(w: list[str]) -> bool:
+    i = 0
+    while i < len(w) and w[i].startswith("-"):
+        i += 2 if w[i] in _GIT_GLOBAL else 1
+    sub, args = (w[i], w[i + 1:]) if i < len(w) else ("", [])
+    if sub == "reset":
+        return "--hard" in args
+    if sub == "clean":
+        short = "".join(a[1:] for a in args if _SHORT.match(a))
+        dry = "n" in short or "--dry-run" in args
+        return not dry and ("f" in short or "--force" in args)
+    return False

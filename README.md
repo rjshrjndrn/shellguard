@@ -3,13 +3,22 @@
 Give it one shell command, get back whether it is **dangerous** or **safe**,
 with the probability that it is dangerous. Small, local, CPU-only.
 
+> [!WARNING]
+> **This is a classifier, not a guarantee.** It catches common destructive commands;
+> it cannot promise to stop every one. An LLM agent is intelligent and can reach the
+> same result in a form neither the rules nor the model recognise: a script file it
+> wrote earlier, `python -c "import shutil; shutil.rmtree(...)"`, a variable as the
+> command name (`r=rm; $r -rf ~`), base64-decoded text piped to `sh`, a Makefile
+> target. Use it as a speed bump that asks before obvious mistakes, together with
+> backups, version control and a sandbox, never instead of them.
+
 ```
 $ shellguard "git clean -fdx"
-{"command": "git clean -fdx", "label": "dangerous", "danger_probability": 0.498, "flagged": [{"part": "git clean -fdx", "danger_probability": 0.498}]}
+{"command": "git clean -fdx", "label": "dangerous", "danger_probability": 1.0, "flagged": [{"part": "git clean -fdx", "danger_probability": 1.0}]}
 $ echo $?
 1
 $ shellguard "cd /tmp && rm -rf build && ls"     # a chain: names the dangerous part
-{"command": "cd /tmp && rm -rf build && ls", "label": "dangerous", "danger_probability": 0.622, "flagged": [{"part": "rm -rf build", "danger_probability": 0.817}]}
+{"command": "cd /tmp && rm -rf build && ls", "label": "dangerous", "danger_probability": 1.0, "flagged": [{"part": "rm -rf build", "danger_probability": 1.0}]}
 ```
 Model A, threshold 0.35 — see [Final output](#final-output).
 
@@ -798,6 +807,23 @@ Code: `src/shellguard/__main__.py`, verdict from `src/shellguard/check.py`. Cont
   of 193 (`cat /etc/shells`, `rev /tmp/file | rev`, both GTFOBins examples); golden
   25/25, hard 42/42 dangerous still caught. Small, because most agent false alarms are
   `python …`, `pip …`, `find -exec`, `git …` or `2>/dev/null`, none of which are here.
+- **Commands that delete or overwrite data are always flagged**, with
+  `danger_probability` 1.0, and the model is not asked about them
+  (`src/shellguard/chain.py: destructive`): `rm` (also `-i`, `-d`), `rmdir`, `unlink`,
+  `shred`, `truncate`, `find -delete` / `find -exec rm`, `git clean -f` (not `-n`),
+  `git reset --hard`, `dd of=` (not `of=/dev/null`), `mkfs*`. Found anywhere in the
+  part (loops, `$( )`, pipes) and through `sudo`, `doas`, `env`, `xargs`, `nohup`, `time`,
+  `nice`, `timeout`, `command`; a path or quotes on the name (`/bin/rm`, `\rm`) don't
+  hide it. Why a rule: the model can't be trusted here. `find … -delete` is labelled
+  safe 419× and dangerous 383× in the data, so adding `-maxdepth 1` (mostly seen in safe
+  rows) dropped `find ~ -name important -delete` from 0.84 to 0.24, and `rmdir` /
+  `rm -d` never appear in it. Cost: every cleanup asks, including the agent deleting
+  its own scratch files (`rm -f test_*.py`) and `rm -rf node_modules`; "allow for
+  session" in the pi hook covers the repeats. Measured on ShellRisk-Bench's benign test
+  commands: flagged 1,335 → 1,338 of 4,001 (the model already flagged almost every
+  delete). On our own test split's safe rows: 312 → 509 of 3,876, because the
+  dataset labels many cleanups safe (`rm -r ./target/`, `dd if=/dev/sda
+  of=/tmp/mbr.bak`).
 - exit code = **0 safe, 1 dangerous, 2 usage error** (grep's convention), so a hook
   can do `shellguard "$cmd" >/dev/null || ask_user`
 

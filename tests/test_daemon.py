@@ -28,7 +28,7 @@ from shellguard.daemon import default_socket, request, serve
 
 
 def fake(commands):
-    table = {"rm -rf build": 0.82, "cd /tmp && rm -rf build": 0.62}
+    table = {"chmod -R 777 build": 0.82, "cd /tmp && chmod -R 777 build": 0.62}
     return [table.get(c, 0.01) for c in commands]
 
 
@@ -83,9 +83,9 @@ def wait_for(cond, timeout=3):
 
 def test_scores_over_socket(tmp):
     d = Daemon(tmp)
-    out = d.ask("cd /tmp && rm -rf build")
-    assert out == {"command": "cd /tmp && rm -rf build", "label": "dangerous", "danger_probability": 0.82,
-                   "flagged": [{"part": "rm -rf build", "danger_probability": 0.82}]}
+    out = d.ask("cd /tmp && chmod -R 777 build")
+    assert out == {"command": "cd /tmp && chmod -R 777 build", "label": "dangerous", "danger_probability": 0.82,
+                   "flagged": [{"part": "chmod -R 777 build", "danger_probability": 0.82}]}
     assert d.ask("ls")["label"] == "safe"
 
 

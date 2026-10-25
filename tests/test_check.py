@@ -35,9 +35,9 @@ def test_only_harmless_commands_are_safe_without_scoring():
 
 
 def test_harmless_part_is_never_flagged():
-    cmd = 'rm -rf /tmp/tester; echo "exit $?"'
-    out = check(cmd, fake({cmd: 0.731, 'echo "exit $?"': 0.758, "rm -rf /tmp/tester": 0.711}))
-    assert out["flagged"] == [{"part": "rm -rf /tmp/tester", "danger_probability": 0.711}]
+    cmd = 'chmod -R 777 /tmp/tester; echo "exit $?"'
+    out = check(cmd, fake({cmd: 0.731, 'echo "exit $?"': 0.758, "chmod -R 777 /tmp/tester": 0.711}))
+    assert out["flagged"] == [{"part": "chmod -R 777 /tmp/tester", "danger_probability": 0.711}]
 
 
 def test_echo_that_writes_a_file_is_still_flagged():
@@ -54,24 +54,24 @@ def test_safe_chain_with_safe_parts_is_safe():
 
 def test_dangerous_part_diluted_by_a_long_script_is_caught():
     script = "python3 - <<'EOF'\n" + "\n".join(f"print({i})" for i in range(25)) + "\nEOF"
-    cmd = f"{script}\nrm -rf /tmp/sgtest"
-    out = check(cmd, fake({cmd: 0.208, script: 0.1, "rm -rf /tmp/sgtest": 0.836}))
+    cmd = f"{script}\nchmod -R 777 /tmp/sgtest"
+    out = check(cmd, fake({cmd: 0.208, script: 0.1, "chmod -R 777 /tmp/sgtest": 0.836}))
     assert out["label"] == "dangerous"
     assert out["danger_probability"] == 0.836
-    assert out["flagged"] == [{"part": "rm -rf /tmp/sgtest", "danger_probability": 0.836}]
+    assert out["flagged"] == [{"part": "chmod -R 777 /tmp/sgtest", "danger_probability": 0.836}]
 
 
 def test_single_dangerous_command_flags_itself():
-    out = check("rm -rf ~", fake({"rm -rf ~": 0.985}))
+    out = check("chmod -R 777 ~", fake({"chmod -R 777 ~": 0.985}))
     assert out["label"] == "dangerous"
-    assert out["flagged"] == [{"part": "rm -rf ~", "danger_probability": 0.985}]
+    assert out["flagged"] == [{"part": "chmod -R 777 ~", "danger_probability": 0.985}]
 
 
 def test_chain_names_the_dangerous_part():
-    cmd = "cd /tmp && rm -rf build && ls"
-    out = check(cmd, fake({cmd: 0.62, "cd /tmp": 0.1, "rm -rf build": 0.82, "ls": 0.01}))
+    cmd = "cd /tmp && chmod -R 777 build && ls"
+    out = check(cmd, fake({cmd: 0.62, "cd /tmp": 0.1, "chmod -R 777 build": 0.82, "ls": 0.01}))
     assert out["danger_probability"] == 0.82  # the command is as dangerous as its worst part
-    assert out["flagged"] == [{"part": "rm -rf build", "danger_probability": 0.82}]
+    assert out["flagged"] == [{"part": "chmod -R 777 build", "danger_probability": 0.82}]
 
 
 def test_several_dangerous_parts_highest_first():
@@ -93,21 +93,21 @@ def test_pipe_is_one_part():
 
 
 def test_repeated_part_flagged_once():
-    cmd = "rm -rf a; rm -rf a"
-    out = check(cmd, fake({cmd: 0.9, "rm -rf a": 0.8}))
-    assert out["flagged"] == [{"part": "rm -rf a", "danger_probability": 0.8}]
+    cmd = "chmod 777 a; chmod 777 a"
+    out = check(cmd, fake({cmd: 0.9, "chmod 777 a": 0.8}))
+    assert out["flagged"] == [{"part": "chmod 777 a", "danger_probability": 0.8}]
 
 
 def test_parts_scored_in_one_batch():
-    cmd = "cd /tmp && rm -rf build && ls"
-    s = fake({cmd: 0.62, "rm -rf build": 0.82})
+    cmd = "cd /tmp && chmod -R 777 build && ls"
+    s = fake({cmd: 0.62, "chmod -R 777 build": 0.82})
     check(cmd, s)
-    assert s.calls == [[cmd, "rm -rf build"]]  # whole + parts together; cd, ls harmless
+    assert s.calls == [[cmd, "chmod -R 777 build"]]  # whole + parts together; cd, ls harmless
 
 
 def test_probabilities_rounded_to_3_decimals():
-    cmd = "cd /tmp && rm -rf build"
-    out = check(cmd, fake({cmd: 0.923456, "rm -rf build": 0.821987}))
+    cmd = "cd /tmp && chmod -R 777 build"
+    out = check(cmd, fake({cmd: 0.923456, "chmod -R 777 build": 0.821987}))
     assert out["danger_probability"] == 0.923
     assert out["flagged"][0]["danger_probability"] == 0.822
 
@@ -179,3 +179,36 @@ def test_read_only_chain_is_safe_without_scoring():
     cmd = "grep -rn foo src | head -20 && sed -n '1,5p' a.py; cat README.md | wc -l"
     assert check(cmd, s) == {"label": "safe", "danger_probability": 0.0, "flagged": []}
     assert s.calls == []
+
+
+# A part that deletes or overwrites data (chain.destructive) is dangerous whatever the
+# model says, with danger_probability 1.0. The model is not asked about it.
+def test_destructive_part_is_flagged_even_if_the_model_says_safe():
+    cmd = "find ~ -maxdepth 1 -name important -delete"
+    s = fake({cmd: 0.238})
+    assert check(cmd, s) == {"label": "dangerous", "danger_probability": 1.0,
+                             "flagged": [{"part": cmd, "danger_probability": 1.0}]}
+    assert s.calls == []
+
+
+def test_destructive_part_in_a_chain_is_named():
+    cmd = "cd ~ && rmdir important && ls"
+    s = fake({cmd: 0.1})
+    out = check(cmd, s)
+    assert out["flagged"] == [{"part": "rmdir important", "danger_probability": 1.0}]
+    assert s.calls == []  # every other part is harmless: nothing left to score
+
+
+def test_destructive_and_model_flagged_parts_together():
+    cmd = "git reset --hard && chmod -R 777 . && npm test"
+    s = fake({cmd: 0.5, "chmod -R 777 .": 0.9, "npm test": 0.1})
+    out = check(cmd, s)
+    assert out["flagged"] == [{"part": "git reset --hard", "danger_probability": 1.0},
+                              {"part": "chmod -R 777 .", "danger_probability": 0.9}]
+    assert s.calls == [[cmd, "chmod -R 777 .", "npm test"]]
+
+
+def test_real_model_bypass_with_maxdepth_is_caught():
+    for cmd in ["find ~ -maxdepth 1 -name important -delete",
+                "find ~ -maxdepth 1 -name important -type d -empty -delete", "rmdir ~/important"]:
+        assert check(cmd)["label"] == "dangerous", cmd

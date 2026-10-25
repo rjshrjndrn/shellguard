@@ -144,3 +144,41 @@ def test_known_safe(part):
 ])
 def test_not_known_safe(part):
     assert not harmless(part)
+
+
+# Known destructive: deletes or overwrites data, read off the syntax tree. The model
+# can't be trusted here: find -delete is labelled safe 419x and dangerous 383x, so
+# `-maxdepth 1` (a "safe" word) dropped `find ~ ... -delete` from 0.84 to 0.24.
+# Any command in the part counts: inside loops, $( ), pipes. Path or quotes on the
+# name don't hide it (/bin/rm, \rm, "rm").
+from shellguard.chain import destructive  # noqa: E402
+
+
+@pytest.mark.parametrize("part", [
+    "find ~ -maxdepth 1 -name important -delete",
+    "find ~ -maxdepth 1 -name important -type d -empty -delete",
+    "find . -name x -exec rm {} \\;", "find . -execdir rm -f {} +", "find . -ok rmdir {} \\;",
+    "rmdir ~/important", "rm -d ~/important", "rm notes.txt", "rm -rf build",
+    "unlink x", "shred -u x", "/bin/rm x", "\\rm x", '"rm" x',
+    "sudo rm x", "sudo -u root rm x", "doas rm x", "env rm x", "env FOO=1 rm x",
+    "command rm x", "nohup rm x", "time rm x", "nice -n 5 rm x", "timeout 5 rm x",
+    "find . -name x | xargs rm", "find . -print0 | xargs -0 rm -f", "ls | xargs -I {} rm {}",
+    "for f in *.log; do rm $f; done", "echo $(rm x)", "(cd /tmp && rm x)",
+    "git clean -f", "git clean -fdx", "git clean -d --force", "git -C repo clean -xdf",
+    "git reset --hard", "git reset --hard HEAD~3", "git -c x=y reset --hard origin/main",
+    "truncate -s 0 app.log", "dd if=/dev/zero of=/dev/sda bs=1M", "sudo dd of=disk.img if=x",
+    "mkfs /dev/sdb1", "mkfs.ext4 /dev/sdb1", "sudo mkfs.vfat /dev/sdc",
+])
+def test_destructive(part):
+    assert destructive(part)
+
+
+@pytest.mark.parametrize("part", [
+    "find . -name '*.py'", "find . -name x -exec grep -l foo {} \\;", 'grep -rn "rm -rf" src',
+    'echo "rm -rf ~"', "echo rm", "git rm --cached x", "git clean -n", "git clean -fn",
+    "git clean --dry-run -f", "git reset HEAD~1", "git reset --soft HEAD~1", "git status",
+    "dd if=/dev/sda bs=1M count=1", "dd if=/dev/sda of=/dev/null bs=512 count=1", "command -v rm", "which rm", "type rmdir", "xargs grep rm",
+    "ls rm", "cat rmdir.txt", "npm run rm", "", "echo 'unclosed",
+])
+def test_not_destructive(part):
+    assert not destructive(part)
