@@ -771,6 +771,13 @@ Code: `src/shellguard/__main__.py`, verdict from `src/shellguard/check.py`. Cont
   on `&&` `||` `;` newline — never on `|`, quotes, `$( )`, loops or heredocs. Every part
   ≥ 0.35 is listed, highest first; if no part is dangerous alone, the danger is the
   combination and the whole command is the one flagged part.
+- **Harmless parts are never flagged.** Model A scores short commands noisily
+  (`echo hi` 0.81 is above `rm -rf /tmp/x` 0.71), so a plain `echo`, `printf`, `true`,
+  `false`, `:`, `pwd`, `cd`, `ls`, `test`/`[`, `sleep`, `which` or `type` is skipped, and a
+  command made only of them is `safe` with `danger_probability` 0.0 (the model is not
+  asked). Only plain ones: any redirect (`echo x >> ~/.bashrc`), `$( )`, `<( )`, env
+  assignment (`LD_PRELOAD=… ls`) or pipe makes the part scored as usual
+  (`src/shellguard/chain.py: harmless`).
 - exit code = **0 safe, 1 dangerous, 2 usage error** (grep's convention), so a hook
   can do `shellguard "$cmd" >/dev/null || ask_user`
 
@@ -849,9 +856,11 @@ A dangerous command stops and asks. Only the flagged parts of a chain are listed
   Deny                    d / esc          (arrows + enter work too)
 ```
 
-- **Allow for this session** remembers the flagged parts (whitespace-insensitive). A later
+- **Allow for this session** remembers each flagged part exactly, path included
+  (whitespace-insensitive): allowing `rm -rf /tmp/x` does not allow `rm -rf ~`. A later
   command runs without asking only if *every* part it flags is already allowed; otherwise
-  the popup lists just the new parts.
+  the popup asks about the new parts and lists the others greyed out as
+  `(allowed this session)`.
 - **shellguard itself fails** (not installed, daemon won't start, 1 s timeout): popup
   `⚠ shellguard failed: … Run anyway / Deny`.
 - **No UI** (`pi -p`): dangerous or failed commands are blocked; the reason goes to the

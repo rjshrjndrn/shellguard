@@ -91,3 +91,10 @@ test("daemon error reply counts as a failure", () => {
   const d = decide({ error: "bad request: x" } as any, ui);
   assert.deepEqual(d, { action: "failed", error: "bad request: x" });
 });
+
+test("allowing a part allows that exact command only, path included", () => {
+  const allowed = remember(new Set(), [{ part: "rm -rf /tmp/tester", danger_probability: 0.711 }]);
+  const other: Check = { command: "rm -rf ~", label: "dangerous", danger_probability: 0.985,
+    flagged: [{ part: "rm -rf ~", danger_probability: 0.985 }] };
+  assert.equal(decide(other, { ...ui, allowed }).action, "ask");
+});

@@ -32,7 +32,9 @@ export default function (pi: ExtensionAPI) {
           const [title, ...rest] = render(menu);
           return [
             theme.fg("warning", theme.bold(title)),
-            ...rest.map((l) => (l.startsWith("▸") ? theme.fg("accent", l) : l)),
+            ...rest.map((l) =>
+              l.startsWith("▸") ? theme.fg("accent", l) : l.endsWith("(allowed this session)") ? theme.fg("dim", l) : l,
+            ),
           ].map((l) => truncateToWidth(l, width));
         },
         handleInput(data: string) {

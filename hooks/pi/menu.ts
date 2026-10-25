@@ -19,13 +19,17 @@ const ONCE: Option = { choice: "once", label: "Allow once", key: "", hint: "ente
 const SESSION: Option = { choice: "session", label: "Allow for this session", key: "s", hint: "s" };
 const DENY: Option = { choice: "deny", label: "Deny", key: "d", hint: "d / esc" };
 
+/** `parts` = flagged parts not yet allowed; the rest of check.flagged is shown as allowed. */
 export function askMenu(check: Check, parts: Flagged[]): Menu {
   const body = check.command.split("\n").map((l) => "  " + l);
-  const isWhole = parts.length === 1 && parts[0].part === check.command;
+  const isNew = new Set(parts.map((f) => f.part));
+  const rows = [...parts, ...check.flagged.filter((f) => !isNew.has(f.part))];
+  const isWhole = rows.length === 1 && rows[0].part === check.command;
   if (!isWhole) {
-    const w = Math.max(...parts.map((f) => f.part.length));
-    parts.forEach((f, i) => {
-      body.push(`  ${i === 0 ? "flagged:" : "        "}  ${f.part.padEnd(w)}  ${f.danger_probability}`);
+    const w = Math.max(...rows.map((f) => f.part.length));
+    rows.forEach((f, i) => {
+      const tag = isNew.has(f.part) ? "" : "  (allowed this session)";
+      body.push(`  ${i === 0 ? "flagged:" : "        "}  ${f.part.padEnd(w)}  ${f.danger_probability}${tag}`);
     });
   }
   return {

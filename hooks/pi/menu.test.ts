@@ -70,10 +70,12 @@ test("ask menu renders command, every new flagged part and the key hints", () =>
   assert.match(lines, / {2}Deny\s+d \/ esc/);
 });
 
-test("ask menu lists only the parts it was given (the new ones)", () => {
-  const lines = render(askMenu(check, [check.flagged[1]])).join("\n");
-  assert.doesNotMatch(lines, /git push --force\s+0\.985/);
-  assert.match(lines, /git add -A\s+0\.844/);
+test("parts already allowed this session are shown, marked, after the new ones", () => {
+  // only git add -A is new; git push --force was allowed earlier
+  const lines = render(askMenu(check, [check.flagged[1]]));
+  const add = lines.findIndex((l) => /git add -A\s+0\.844$/.test(l));
+  const push = lines.findIndex((l) => /git push --force\s+0\.985\s+\(allowed this session\)$/.test(l));
+  assert.ok(add >= 0 && push > add, lines.join("\n"));
 });
 
 test("whole command flagged: no separate flagged list", () => {
