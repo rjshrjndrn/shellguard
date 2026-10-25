@@ -133,3 +133,21 @@ test("e2e: shellguard cannot start -> ask + systemMessage, exit 0", () => {
   assert.equal(out.hookSpecificOutput.permissionDecision, "ask");
   assert.match(out.systemMessage, /shellguard unavailable/);
 });
+
+// --- latency: Claude Code waits on this before every Bash call --------------------------
+
+test("e2e: with the daemon warm, a check takes < 150 ms (median of 5)", () => {
+  const d = mkdtempSync("/tmp/sgh");
+  dirs.push(d);
+  const env = { ...process.env, SHELLGUARD_SOCKET: path.join(d, "sock"), SHELLGUARD_CMD: `${PY} -m shellguard` };
+  const once = () => {
+    const t = performance.now();
+    const r = spawnSync("node", [HOOK], { input: JSON.stringify(bash("git status")), env, encoding: "utf8" });
+    assert.equal(r.status, 0, r.stderr);
+    return performance.now() - t;
+  };
+  once(); // cold: starts the daemon (~1.5 s)
+  const ms = Array.from({ length: 5 }, once).sort((a, b) => a - b);
+  console.log(`hook latency ms: ${ms.map((x) => x.toFixed(0)).join(" ")}`);
+  assert.ok(ms[2] < 150, `median ${ms[2].toFixed(0)} ms`);
+});
