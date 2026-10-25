@@ -87,7 +87,7 @@ false alarms over misses: we optimise **recall** on the dangerous class.
  │                                 ▼                         ▲                       │
  │                          model file ──────────────────────┘                       │
  │                                                                                   │
- │  data/golden.csv (48) + data/hard.csv (55) ── never trained on ── final exams     │
+ │  data/golden.csv (48) + data/hard.csv (71) ── never trained on ── final exams     │
  └───────────────────────────────────────────────────────────────────────────────────┘
                                    │  model A ships inside the package
                                    ▼
@@ -845,7 +845,7 @@ What exists now:
 1. **A model file** — `src/shellguard/model_a.joblib` (4.5 MB, committed; rebuilt
    byte-identical by `make train MODEL=model_a` in ~5 s — commit it again after retraining; lives in the package so `uv tool install .`
    carries it — `tests/test_install.py` proves it).  Threshold 0.35. Inside: two vocabularies (char pieces +
-   shell tokens, 149,125 features), their IDF numbers, one weight per feature, one
+   shell tokens, 147,855 features), their IDF numbers, one weight per feature, one
    intercept. Plus the formula in `src/shellguard/model_a.py` and the tokenizer in
    `src/shellguard/tokens.py`. joblib = pickle: only load files you built.
 2. **Python functions** — `from shellguard import predict` → `{"label", "danger_probability"}`;
@@ -857,18 +857,30 @@ Current scores of model A alone (`results/model_a.json`, threshold 0.35):
 
 | set | n | recall | precision | missed | false alarms |
 |---|---|---|---|---|---|
-| test split | 8,402 | 0.988 | 0.941 | 56 | 281 |
+| test split | 8,422 | 0.989 | 0.940 | 50 | 286 |
 | golden | 48 | 1.000 | 0.806 | 0 | 6 |
-| hard | 55 | 1.000 | 0.840 | 0 | 8 |
+| hard | 71 | 0.979 | 0.839 | 1 | 9 |
 
 The CLI and the pi hook use `check()` (model A + chain parts + harmless rules), measured
 on the same sets:
 
 | set | n | recall | precision | missed | false alarms |
 |---|---|---|---|---|---|
-| test split | 8,402 | 0.991 | 0.935 | 40 | 310 |
+| test split | 8,422 | 0.991 | 0.897 | 43 | 515 |
 | golden | 48 | 1.000 | 0.833 | 0 | 5 |
-| hard | 55 | 1.000 | 0.840 | 0 | 8 |
+| hard | 71 | 0.979 | 0.839 | 1 | 9 |
+
+> **Update (debias ~/ and 2>&1):** the raw data taught model A that `~/` (76% of
+> its rows dangerous) and `2>&1` (95%, n=21) mean danger, so `ls -d ~/x ~/y 2>&1`
+> scored 0.64. `data/extra.csv` adds 101 hand-written twins sharing those tokens
+> (`ls`/`cat`/`grep` vs `rm`/`curl | sh`/`chmod`), merged by `prepare` into the
+> normal split; `hard.csv` gained 16 matching exam rows. Result: that command
+> 0.64 → 0.33, the 10 new safe `~/` exam rows average 0.27 → 0.15, hard false
+> alarms 10 → 9. **Accepted regression:** `git branch -D main` 0.369 → 0.301, now
+> missed by model and `check()` (no rule covers it). On the 2,193 test rows unseen by
+> both models: old 14 missed / 71 false alarms, new 16 / 74 — noise. The earlier
+> `check()` test row (310 false alarms) was stale: the old model under today's
+> `check()` gives 493 on its own split.
 
 Tried and parked: **tree-sitter-bash** instead of `shlex` — a tie (8e′), on branch
 `tree-sitter-tokens`. Models B and C stay in the repo for comparison, not shipped.

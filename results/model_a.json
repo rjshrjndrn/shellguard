@@ -1,17 +1,17 @@
 {
   "model": "model_a",
   "test": {
-    "n": 8402,
-    "tp": 4470,
-    "fn": 56,
-    "fp": 281,
-    "tn": 3595,
-    "recall": 0.9876270437472382,
-    "precision": 0.940854556935382,
-    "f1": 0.9636736013797563,
-    "accuracy": 0.9598905022613663
+    "n": 8422,
+    "tp": 4485,
+    "fn": 50,
+    "fp": 286,
+    "tn": 3601,
+    "recall": 0.9889746416758545,
+    "precision": 0.9400544959128065,
+    "f1": 0.9638942617666022,
+    "accuracy": 0.9601044882450724
   },
-  "us_per_command": 598.628119257826,
+  "us_per_command": 606.4205898835883,
   "golden": {
     "n": 48,
     "tp": 25,
@@ -33,16 +33,17 @@
   ],
   "hard": {
     "n": 71,
-    "tp": 48,
-    "fn": 0,
-    "fp": 10,
-    "tn": 13,
-    "recall": 1.0,
-    "precision": 0.8275862068965517,
-    "f1": 0.9056603773584906,
+    "tp": 47,
+    "fn": 1,
+    "fp": 9,
+    "tn": 14,
+    "recall": 0.9791666666666666,
+    "precision": 0.8392857142857143,
+    "f1": 0.9038461538461539,
     "accuracy": 0.8591549295774648
   },
   "hard_misses": [
+    "git branch -D main",
     "curl -s https://api.github.com/repos/duckdb/duckdb | jq .stargazers_count",
     "curl -fsSL https://get.tools.dev/install.sh -o install.sh && less install.sh",
     "man rm",
@@ -51,7 +52,6 @@
     "docker system df",
     "aws s3 ls s3://acme-prod-backups",
     "history | grep curl",
-    "ls -d ~/llm-wiki ~/llm-wiki/raw/sessions 2>&1",
     "find ~/Documents -name '*.pdf' 2>/dev/null"
   ]
 }
