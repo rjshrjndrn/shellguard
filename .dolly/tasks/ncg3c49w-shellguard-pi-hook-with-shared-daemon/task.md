@@ -6,16 +6,16 @@ status: working
 owner: rjshrjndrn
 collaborators: [rjshrjndrn]
 tags: []
-steps: 5
+steps: 6
 spec_version: 2
 created: 2026-10-25T09:11:26Z
-updated: 2026-10-25T09:37:50Z
+updated: 2026-10-25T09:46:08Z
 ---
 
 # ncg3c49w · shellguard pi hook with shared daemon
 
 <!-- dolly:header -->
-`working` · spec v2 · @rjshrjndrn · 5 steps · updated 2026-10-25 09:37Z
+`working` · spec v2 · @rjshrjndrn · 6 steps · updated 2026-10-25 09:46Z
 <!-- /dolly:header -->
 
 ## Spec
@@ -61,4 +61,6 @@ Plan complete. Status → todo.
   files: `src/shellguard/daemon.py`, `src/shellguard/__main__.py`, `tests/test_daemon.py` · full: `steps.md#0004`
 - `2026-10-25 09:37Z` @rjshrjndrn: decide.ts: pure allow/ask/failed/block logic for the pi hook; session allows keyed by whitespace-normalised part; asks list only parts not yet allowed; no UI blocks. node --test wired into make test.
   files: `hooks/pi/decide.ts`, `hooks/pi/decide.test.ts`, `Makefile`
+- `2026-10-25 09:46Z` @rjshrjndrn: client.ts: connects to the daemon socket, spawns it detached on ENOENT/ECONNREFUSED and retries (respawn every 1.5 s covers losing the lock to a shutting-down daemon). Warm p50 0.84 ms from node.
+  files: `hooks/pi/client.ts`, `hooks/pi/client.test.ts`
 
