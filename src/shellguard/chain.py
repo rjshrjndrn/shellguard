@@ -225,6 +225,43 @@ def _unwrap(name: str, w: list[str]) -> list[str]:
     return w[i:]
 
 
+_SHELLS = {"sh", "bash", "zsh", "dash", "ksh"}
+
+
+def shell_heredocs(part: str) -> list[str]:
+    """Bodies of heredocs fed to a shell (`bash <<'EOF' ... EOF`, `sudo sh -s <<EOF`):
+    that text is a script the shell runs, so it can be checked like any command.
+    Not for `bash file.sh <<EOF` (stdin of a script) or `bash -c` (script is the arg)."""
+    root = _PARSER.parse(part.encode()).root_node
+    if root.has_error:
+        return []
+    bodies, stack = [], [root]
+    while stack:
+        n = stack.pop()
+        cmd = n.child_by_field_name("body") if n.type == "redirected_statement" else None
+        while cmd is not None and cmd.type == "list":  # `cd x && sh <<EOF`: the last one reads it
+            cmd = cmd.named_children[-1]
+        if cmd is not None and cmd.type == "command" and _runs_stdin(
+                [_word(c) for c in cmd.named_children if c.type != "variable_assignment"]):
+            bodies += [b.text.decode() for r in n.named_children if r.type == "heredoc_redirect"
+                       for b in r.named_children if b.type == "heredoc_body"]
+        stack.extend(reversed(n.named_children))
+    return bodies
+
+
+def _runs_stdin(w: list[str]) -> bool:
+    """True if words `w` are a shell that reads its script from stdin."""
+    while w and w[0].rsplit("/", 1)[-1] in _WRAPPERS:
+        w = _unwrap(w[0].rsplit("/", 1)[-1], w[1:])
+    if not w or w[0].rsplit("/", 1)[-1] not in _SHELLS:
+        return False
+    flags = [a for a in w[1:] if a.startswith("-")]
+    short = "".join(a[1:] for a in flags if _SHORT.match(a))
+    if "c" in short:
+        return False
+    return "s" in short or len(flags) == len(w) - 1  # -s: the rest are $1 $2 ...
+
+
 def _git_destroys(w: list[str]) -> bool:
     i = 0
     while i < len(w) and w[i].startswith("-"):

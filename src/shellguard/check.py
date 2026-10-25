@@ -17,7 +17,7 @@ Shared by the CLI and the daemon.
 """
 from collections.abc import Callable
 
-from shellguard.chain import destructive, harmless, split_chain
+from shellguard.chain import destructive, harmless, shell_heredocs, split_chain
 from shellguard.model_a import THRESHOLD
 
 Scorer = Callable[[list[str]], list[float]]
@@ -30,7 +30,10 @@ def _model_scorer(commands: list[str]) -> list[float]:
 
 
 def check(command: str, score: Scorer = _model_scorer) -> dict:
-    parts = list(dict.fromkeys(split_chain(command)))  # unique, order kept
+    parts = split_chain(command)
+    for s in parts:  # `bash <<EOF` runs its body: check those commands too (grows: nesting)
+        parts += [b for body in shell_heredocs(s) for b in split_chain(body)]
+    parts = list(dict.fromkeys(parts))  # unique, order kept
     if parts and all(harmless(s) for s in parts):  # e.g. `echo hi`, `cd /tmp && pwd`
         return {"label": "safe", "danger_probability": 0.0, "flagged": []}
     ruled = [s for s in parts if destructive(s)]  # deletes data: dangerous, no model

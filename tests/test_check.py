@@ -212,3 +212,39 @@ def test_real_model_bypass_with_maxdepth_is_caught():
     for cmd in ["find ~ -maxdepth 1 -name important -delete",
                 "find ~ -maxdepth 1 -name important -type d -empty -delete", "rmdir ~/important"]:
         assert check(cmd)["label"] == "dangerous", cmd
+
+
+# A shell reading a heredoc runs its body: body commands go through the same rules.
+def test_delete_in_shell_heredoc_is_flagged_by_rule():
+    cmd = "bash <<'EOF'\nls\nrm -rf ~/x\nEOF"
+    out = check(cmd, fake({}))  # model says 0 everywhere: only the rule can catch it
+    assert out["label"] == "dangerous"
+    assert out["flagged"][0] == {"part": "rm -rf ~/x", "danger_probability": 1.0}
+
+
+def test_delete_in_heredoc_after_chain_and_sudo():
+    out = check("cd x && sudo bash <<'EOF'\nset -e\nrm -rf /opt/app\nEOF", fake({}))
+    assert {"part": "rm -rf /opt/app", "danger_probability": 1.0} in out["flagged"]
+
+
+def test_nested_shell_heredoc():
+    out = check("bash <<'A'\nsh <<'B'\nrm -rf ~/x\nB\nA", fake({}))
+    assert {"part": "rm -rf ~/x", "danger_probability": 1.0} in out["flagged"]
+
+
+def test_heredoc_body_part_scored_alone_not_diluted():
+    cmd = "bash <<'EOF'\nset -e\nmake build\nchmod -R 777 ~/x\nEOF"
+    out = check(cmd, fake({cmd: 0.2, "chmod -R 777 ~/x": 0.9}))
+    assert out["flagged"] == [{"part": "chmod -R 777 ~/x", "danger_probability": 0.9}]
+
+
+def test_harmless_heredoc_body_is_not_scored():
+    cmd = "bash <<'EOF'\nls\npwd\nEOF"
+    s = fake({cmd: 0.1})
+    assert check(cmd, s)["label"] == "safe"
+    assert "ls" not in s.calls[0] and "pwd" not in s.calls[0]
+
+
+def test_text_heredoc_is_not_read_as_commands():
+    cmd = "cat > notes.txt <<'EOF'\nrm -rf / is bad\nEOF"
+    assert check(cmd, fake({cmd: 0.1}))["label"] == "safe"

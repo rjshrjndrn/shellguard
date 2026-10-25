@@ -182,3 +182,40 @@ def test_destructive(part):
 ])
 def test_not_destructive(part):
     assert not destructive(part)
+
+
+# A heredoc fed to a shell is a script: its body is what runs. Strip the <<EOF header and
+# EOF footer and you get the text to check. Other readers (cat, python) get data or
+# another language, so they are left to the model.
+SHELL_HEREDOCS = [
+    ("bash <<'EOF'\nls\nrm -rf ~/x\nEOF", ["ls\nrm -rf ~/x\n"]),
+    ("cd x && sh -s <<-EOF\n\trm -rf $HOME/x\nEOF", ["rm -rf $HOME/x\n"]),
+    ("sudo bash <<EOF\nrm -rf /opt/app\nEOF", ["rm -rf /opt/app\n"]),
+    ("bash -e -x <<'EOF'\nmake\nEOF", ["make\n"]),
+    ("/bin/zsh <<'EOF'\nmake\nEOF", ["make\n"]),
+    ("bash -s -- prod <<'EOF'\nmake $1\nEOF", ["make $1\n"]),
+    ("bash <<'EOF' | tee log\nmake\nEOF", ["make\n"]),
+    ("if true; then dash <<'EOF'\nmake\nEOF\nfi", ["make\n"]),
+]
+NOT_SHELL_HEREDOCS = [
+    "cat > notes.txt <<'EOF'\nrm -rf / is bad\nEOF",  # text into a file
+    "python3 - <<'EOF'\nimport shutil\nEOF",  # another language
+    "bash deploy.sh <<'EOF'\nyes\nEOF",  # stdin of a script file, not the script
+    "bash -c 'read x' <<'EOF'\nrm -rf ~\nEOF",  # -c: the script is the argument
+    "bash <<< 'make'",  # herestring: out of scope
+    "ls",
+]
+
+
+@pytest.mark.parametrize("part,bodies", SHELL_HEREDOCS, ids=[c for c, _ in SHELL_HEREDOCS])
+def test_shell_heredocs(part, bodies):
+    from shellguard.chain import shell_heredocs
+
+    assert shell_heredocs(part) == bodies
+
+
+@pytest.mark.parametrize("part", NOT_SHELL_HEREDOCS)
+def test_not_shell_heredocs(part):
+    from shellguard.chain import shell_heredocs
+
+    assert shell_heredocs(part) == []

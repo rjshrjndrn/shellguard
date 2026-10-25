@@ -866,7 +866,7 @@ on the same sets:
 
 | set | n | recall | precision | missed | false alarms |
 |---|---|---|---|---|---|
-| test split | 8,422 | 0.991 | 0.897 | 43 | 515 |
+| test split | 8,422 | 0.991 | 0.897 | 43 | 516 |
 | golden | 48 | 1.000 | 0.833 | 0 | 5 |
 | hard | 71 | 0.979 | 0.839 | 1 | 9 |
 
@@ -881,6 +881,15 @@ on the same sets:
 > both models: old 14 missed / 71 false alarms, new 16 / 74 — noise. The earlier
 > `check()` test row (310 false alarms) was stale: the old model under today's
 > `check()` gives 493 on its own split.
+
+> **Update (shell heredocs):** `bash <<'EOF' … EOF` (also `sh`/`zsh`/`dash`/`ksh`,
+> `-s`, behind `sudo`/`env`, last in a `&&` chain, nested) runs its body, so
+> `check()` now splits the body and runs each command through the same rules and
+> model as the outer chain: `rm -rf` inside is flagged 1.0 by rule instead of
+> depending on the model's whole-command score. Text heredocs (`cat > f <<EOF`),
+> other languages (`python3 - <<EOF`), `bash file.sh <<EOF` and `bash -c` are left as
+> they were. Not covered: here-strings (`bash <<< "…"`) and piped scripts
+> (`echo … | sh`). Test split: 25 rows affected, false alarms 515 → 516.
 
 Tried and parked: **tree-sitter-bash** instead of `shlex` — a tie (8e′), on branch
 `tree-sitter-tokens`. Models B and C stay in the repo for comparison, not shipped.
