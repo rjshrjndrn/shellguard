@@ -18,7 +18,16 @@ from *that* point in time (later steps changed data and model), the
 
 ## Quick start
 
-Needs [uv](https://docs.astral.sh/uv/). Everything below is reproducible from zero:
+Needs [uv](https://docs.astral.sh/uv/). The trained model A is committed, so it works
+right after cloning:
+
+```bash
+uv run shellguard "rm -rf ~"   # inside the repo
+uv tool install --python 3.12 git+https://github.com/rjshrjndrn/shellguard   # or globally
+shellguard "rm -rf ~"          # → {"label": "dangerous", ...}, exit 1
+```
+
+Rebuild everything from zero (optional; same data + code gives a byte-identical model):
 
 ```bash
 uv sync                      # install deps (Python 3.12)
@@ -27,9 +36,7 @@ make prepare                 # merge + label + split → data/{train,test}.parqu
 make train MODEL=model_a     # ~5 s → src/shellguard/model_a.joblib
 make eval  MODEL=model_a     # test split + golden + hard → results/model_a.json
 make test                    # pytest, incl. building + installing the wheel
-
-uv run shellguard "rm -rf ~" # use it inside the repo
-uv tool install .            # or globally (after make train): shellguard "…" from anywhere
+uv tool install --force --python 3.12 .   # reinstall globally after retraining
 ```
 
 ---
@@ -737,7 +744,7 @@ the list, so progress can't go unnoticed. `make test`: all green.
 
 ```bash
 uv run shellguard "git clean -fdx"         # in the repo
-uv tool install .                          # or install globally (needs make train first), then: shellguard "…"
+uv tool install --python 3.12 .            # or install globally, then: shellguard "…"
 ```
 
 ```
@@ -768,8 +775,8 @@ usage on stderr; stdout is exactly one JSON line; no duckdb/torch at startup.
 
 What exists now:
 
-1. **A model file** — `src/shellguard/model_a.joblib` (4.5 MB, git-ignored, rebuilt by
-   `make train MODEL=model_a` in ~5 s; lives in the package so `uv tool install .`
+1. **A model file** — `src/shellguard/model_a.joblib` (4.5 MB, committed; rebuilt
+   byte-identical by `make train MODEL=model_a` in ~5 s — commit it again after retraining; lives in the package so `uv tool install .`
    carries it — `tests/test_install.py` proves it).  Threshold 0.35. Inside: two vocabularies (char pieces +
    shell tokens, 149,125 features), their IDF numbers, one weight per feature, one
    intercept. Plus the formula in `src/shellguard/model_a.py` and the tokenizer in
@@ -802,7 +809,7 @@ data/golden.csv          hand-labelled exam, 48 (committed)
 data/hard.csv            hand-labelled indirect-danger exam, 55 (committed)
 data/raw/<dataset>/      downloaded parquet + jsonl (git-ignored)
 data/{train,test}.parquet  our split (git-ignored, rebuilt by make)
-src/shellguard/          code; model_a.joblib lands here (git-ignored, shipped in the wheel)
+src/shellguard/          code; model_a.joblib lives here (committed, shipped in the wheel)
 tests/                   pytest (golden.py = shared exam loader)
 models/                  models B and C, fastembed cache (git-ignored)
 results/                 scores per model (committed)
