@@ -2,20 +2,20 @@
 id: ncg3c49w
 slug: shellguard-pi-hook-with-shared-daemon
 title: shellguard pi hook with shared daemon
-status: working
+status: validating
 owner: rjshrjndrn
 collaborators: [rjshrjndrn]
 tags: []
-steps: 7
+steps: 8
 spec_version: 2
 created: 2026-10-25T09:11:26Z
-updated: 2026-10-25T09:55:51Z
+updated: 2026-10-25T09:59:09Z
 ---
 
 # ncg3c49w · shellguard pi hook with shared daemon
 
 <!-- dolly:header -->
-`working` · spec v2 · @rjshrjndrn · 7 steps · updated 2026-10-25 09:55Z
+`validating` · spec v2 · @rjshrjndrn · 8 steps · updated 2026-10-25 09:59Z
 <!-- /dolly:header -->
 
 ## Spec
@@ -65,4 +65,7 @@ Plan complete. Status → todo.
   files: `hooks/pi/client.ts`, `hooks/pi/client.test.ts`
 - `2026-10-25 09:55Z` @rjshrjndrn: pi extension works end to end in real pi: popup names only new flagged parts, s remembers them, arrows/esc deny, failure popup when shellguard is missing, /shellguard on|off|status, no-UI blocks with reason.
   files: `hooks/pi/index.ts`, `hooks/pi/menu.ts`, `hooks/pi/menu.test.ts` · full: `steps.md#0007`
+- `2026-10-25 09:59Z` @rjshrjndrn: make hook-pi installs CLI (py3.12) + copies runtime .ts to ~/.pi/agent/extensions/shellguard and drops the daemon socket so a fresh daemon starts; unhook-pi removes both. Installed for real; pi -p blocked rm -rf with no --extension flag.
+  files: `Makefile`, `README.md`, `tests/test_make_hook.py`
+- `2026-10-25 09:59Z` @rjshrjndrn: status working → validating. Restart pi (or /reload): try a chain with rm -rf (popup names it), press s, repeat; /shellguard off|on|status; make unhook-pi removes it.
 
